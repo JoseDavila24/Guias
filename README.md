@@ -212,5 +212,3 @@ git diff
    git push origin nombre-de-la-rama
    ```
 5. **Crea un Pull Request** en GitHub para revisión y fusión.
-
----
