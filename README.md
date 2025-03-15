@@ -14,6 +14,7 @@ Bienvenido al repositorio **Guías ABC**, donde encontrarás explicaciones senci
 │── guias/
 │   ├── Mi_flujo_de_trabajo_en_GIT.md
 │   ├── Como_usar_LXD.md
+│   ├── servidor-correo-ubuntu.md
 │── CONTRIBUTING.md
 │── LICENSE
 ```
