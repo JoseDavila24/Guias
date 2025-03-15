@@ -272,15 +272,16 @@ Si deseas tener acceso rápido a todos los comandos y configuraciones, clona el 
    ```
 2. **Clonar el repositorio:**
    ```bash
-   git clone https://github.com/JoseDavila24/servidor-correo-ubuntu.git
+   git clone https://github.com/JoseDavila24/guias-abc.git
    ```
 3. **Ingresar al repositorio:**
    ```bash
    cd servidor-correo-ubuntu
    ```
-4. **Consultar el archivo README:**
+   Busca la guia servidor-correo-ubuntu.md
+4. **Consultar el archivo:**
    ```bash
-   cat README
+   cat servidor-correo-ubuntu.md
    ```
 
 ---
