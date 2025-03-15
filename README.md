@@ -19,7 +19,8 @@ Bienvenido al repositorio **Guías ABC**, donde encontrarás explicaciones senci
 ```
 
 ## 🛠️ ¿Cómo contribuir?
-Para más detalles sobre cómo colaborar, revisa el documento [CONTRIBUTING.md](CONTRIBUTING.md).## 🌟 Licencia
+Para más detalles sobre cómo colaborar, revisa el documento [CONTRIBUTING.md](CONTRIBUTING.md).
+## 🌟 Licencia
 Este proyecto está bajo la licencia **MIT**.
 
 ¡Esperamos que estas guías te sean útiles! 🚀
