@@ -7,21 +7,13 @@ Bienvenido al repositorio **Guías ABC**, donde encontrarás explicaciones senci
 - **B - Cómo instalarlo**: Pasos básicos para instalarlo en diferentes sistemas.
 - **C - Comandos y uso básico**: Principales comandos y funciones esenciales.
 
-## 📂 Estructura del Repositorio
-```
-/guias-abc/
-│── README.md
-│── guias/
-│   ├── Mi_flujo_de_trabajo_en_GIT.md
-│   ├── Como_usar_LXD.md
-│   ├── servidor-correo-ubuntu.md
-│── CONTRIBUTING.md
-│── LICENSE
-```
+## 📖 Guías Disponibles
+- [Mi Flujo de Trabajo en Git](guias/Mi_flujo_de_trabajo_en_GIT.md)
+- [Cómo Usar LXD](guias/Como_usar_LXD.md)
+- [Servidor de Correo en Ubuntu](guias/servidor-correo-ubuntu.md)
 
 ## 🛠️ ¿Cómo contribuir?
-Para más detalles sobre cómo colaborar, revisa el documento [CONTRIBUTING.md](CONTRIBUTING.md).
-## 🌟 Licencia
+Para más detalles sobre cómo colaborar, revisa el documento [CONTRIBUTING.md](CONTRIBUTING.md).## 🌟 Licencia
 Este proyecto está bajo la licencia **MIT**.
 
 ¡Esperamos que estas guías te sean útiles! 🚀
