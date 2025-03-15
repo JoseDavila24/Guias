@@ -21,23 +21,8 @@ Bienvenido al repositorio **Guías ABC**, donde encontrarás explicaciones senci
 ```
 
 ## 🛠️ ¿Cómo contribuir?
-1. **Forkea** este repositorio.
-2. **Clona** tu fork:
-   ```bash
-   git clone https://github.com/JoseDavila24/guias-abc.git
-   ```
-3. **Crea una nueva rama:**
-   ```bash
-   git checkout -b nueva-guia
-   ```
-4. **Añade tu guía y haz un commit:**
-   ```bash
-   git add .
-   git commit -m "Agregando guía sobre XYZ"
-   ```
-5. **Envía un pull request.**
-
-## 🌟 Licencia
+Para más detalles sobre cómo colaborar, revisa el documento [CONTRIBUTING.md](CONTRIBUTING.md).## 🌟 Licencia
 Este proyecto está bajo la licencia **MIT**.
 
 ¡Esperamos que estas guías te sean útiles! 🚀
+
