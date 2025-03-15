@@ -11,19 +11,15 @@ Bienvenido al repositorio **Guías ABC**, donde encontrarás explicaciones senci
 ```
 /guias-abc/
 │── README.md
-│── herramientas/
-│   ├── git/
-│   │   ├── Mi_flujo_de_trabajo_en_GIT.md
-│   ├── lxd/
-│   │   ├── Como_usar_LXD.md
+│── guias/
+│   ├── Mi_flujo_de_trabajo_en_GIT.md
+│   ├── Como_usar_LXD.md
 │── CONTRIBUTING.md
 │── LICENSE
 ```
 
 ## 🛠️ ¿Cómo contribuir?
-Para más detalles sobre cómo colaborar, revisa el documento [CONTRIBUTING.md](CONTRIBUTING.md).
-## 🌟 Licencia
+Para más detalles sobre cómo colaborar, revisa el documento [CONTRIBUTING.md](CONTRIBUTING.md).## 🌟 Licencia
 Este proyecto está bajo la licencia **MIT**.
 
 ¡Esperamos que estas guías te sean útiles! 🚀
-
