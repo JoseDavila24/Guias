@@ -276,7 +276,7 @@ Si deseas tener acceso rápido a todos los comandos y configuraciones, clona el 
    ```
 3. **Ingresar al repositorio:**
    ```bash
-   cd servidor-correo-ubuntu
+   cd guias-abc/guias
    ```
    Busca la guia servidor-correo-ubuntu.md
 4. **Consultar el archivo:**
