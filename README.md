@@ -188,30 +188,18 @@ Crea un archivo llamado **`login.sql`** con el siguiente contenido mejorado, el 
 ```sql
 -- login.sql - configuración automática mejorada para SQL*Plus
 
--- Configuración visual
-SET LINESIZE 250
-SET PAGESIZE 500
-SET WRAP ON
+SET LINESIZE 200
+SET PAGESIZE 50
+SET WRAP OFF
 SET FEEDBACK ON
 SET TRIMSPOOL ON
 SET VERIFY OFF
 SET COLSEP ' | '
 SET HEADING ON
+SET NULL 'N/A'
 
--- Formato predeterminado mejorado para columnas comunes
-COLUMN ISBN FORMAT A20 HEADING 'ISBN'
-COLUMN TITULO FORMAT A60 HEADING 'Título'
-COLUMN AUTOR FORMAT A40 HEADING 'Autor'
-COLUMN table_name FORMAT A30 HEADING 'Nombre de Tabla'
-COLUMN tablespace_name FORMAT A20 HEADING 'Tablespace'
-COLUMN status FORMAT A10 HEADING 'Estado'
-COLUMN num_rows FORMAT 999,999,999 HEADING 'Número de Filas'
-COLUMN last_analyzed FORMAT A20 HEADING 'Último Análisis'
-
--- Formato estándar para fechas
 ALTER SESSION SET NLS_DATE_FORMAT='DD-MON-YYYY HH24:MI';
 
--- Mensaje inicial personalizado y ordenado visualmente
 PROMPT *********************************************************
 PROMPT *            Bienvenido a SQL*Plus (Biblioteca)         *
 PROMPT *                                                       *
