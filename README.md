@@ -66,6 +66,10 @@ sudo dpkg -i --force-architecture \
 echo "Corrigiendo posibles dependencias faltantes..."
 sudo apt --fix-broken install -y
 
+# Instalar rlwrap para mejorar la experiencia en SQL*Plus
+echo "Instalando rlwrap para mejorar la experiencia en SQL*Plus..."
+sudo apt-get install -y rlwrap
+
 # Configurar Oracle XE
 echo "Configurando Oracle XE..."
 sudo /etc/init.d/oracle-xe configure
@@ -77,10 +81,21 @@ echo "export ORACLE_SID=XE" >> ~/.bashrc
 echo "export PATH=\$PATH:\$ORACLE_HOME/bin" >> ~/.bashrc
 echo "unset TWO_TASK" >> ~/.bashrc
 
+# Añadir alias para usar rlwrap automáticamente con sqlplus
+echo "Configurando alias para sqlplus..."
+echo "alias sqlplus='rlwrap sqlplus'" >> ~/.bashrc
+
 # Recargar el archivo .bashrc
 source ~/.bashrc
 
+# Mensaje final con ejemplos de uso
 echo "Instalación y configuración completadas."
+echo ""
+echo "Para iniciar sesión en SQL*Plus, usa los siguientes comandos:"
+echo "  sqlplus SYS/tu_contraseña AS SYSDBA"
+echo "  sqlplus SYSTEM/tu_contraseña"
+echo ""
+echo "El alias 'sqlplus' ya está configurado para usar rlwrap automáticamente."
 ```
 
 ### Ejecución de scripts:
@@ -104,30 +119,44 @@ sudo /etc/init.d/oracle-xe stop     # Detener
 ps -ef | grep oracle                # Verificar procesos
 ```
 
-## 5. Configura acceso a SQL*Plus con `rlwrap` (Optimizado)
+---
 
-`rlwrap` mejora la experiencia al usar SQL*Plus:
+## 5. Ejemplos de cómo iniciar sesión en SQL*Plus
 
-### Instalación:
+Una vez completada la instalación y configuración, puedes iniciar sesión en SQL*Plus usando el alias `sqlplus`, que ya incluye `rlwrap` automáticamente. Aquí tienes algunos ejemplos:
+
+### Iniciar sesión como `SYS` (usuario administrador):
 ```bash
-sudo apt-get install rlwrap
+sqlplus SYS/tu_contraseña AS SYSDBA
 ```
 
-### Configuración permanente:
-Edita el archivo `~/.zshrc` o `~/.bashrc` según tu shell (`zsh` recomendado):
+### Iniciar sesión como `SYSTEM` (usuario administrativo):
 ```bash
-nano ~/.zshrc
+sqlplus SYSTEM/tu_contraseña
 ```
 
-Agrega el alias:
+### Iniciar sesión con un usuario creado:
+Si has creado un usuario (por ejemplo, `nuevo_usuario`), puedes iniciar sesión de la siguiente manera:
 ```bash
-alias sqlplus='rlwrap sqlplus'
+sqlplus nuevo_usuario/contraseña
 ```
 
-Guarda y aplica cambios:
-```bash
-source ~/.zshrc
+### Verificar la conexión:
+Una vez dentro de SQL*Plus, puedes ejecutar consultas SQL para verificar que todo funciona correctamente. Por ejemplo:
+```sql
+SELECT * FROM v$version;
 ```
+
+---
+
+### Notas adicionales:
+- El alias `sqlplus` ya está configurado para usar `rlwrap`, lo que permite navegar por el historial de comandos y mejorar la experiencia en la línea de comandos.
+- Si necesitas desactivar `rlwrap` temporalmente, puedes usar el comando completo:
+  ```bash
+  /usr/lib/oracle/xe/app/oracle/product/10.2.0/server/bin/sqlplus
+  ```
+
+---
 
 ## 6. Gestión básica de usuarios
 
