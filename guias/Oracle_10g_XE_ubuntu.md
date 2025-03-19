@@ -10,7 +10,7 @@ uname -m
 
 ## 2. Instalación mediante scripts
 
-Descarga o prepara los siguientes archivos en la carpeta `Linux-DEB`:
+Descarga o prepara los siguientes archivos en la carpeta `Oracle10gXE`:
 - `oracle-xe-universal_10.2.0.1-1.1_i386.deb`
 - `oracle-xe-client_10.2.0.1-1.2_i386.deb`
 - `libaio_0.3.104-1_i386.deb`
@@ -72,7 +72,7 @@ echo "Instalación y configuración completadas."
 ### Ejecución de scripts:
 
 ```bash
-cd /ruta/Linux-DEB
+cd /ruta/Oracle10gXE
 chmod +x multiarch-setup.sh oracle-xe-install.sh
 
 # Solo si es necesario (sistema 64 bits)
