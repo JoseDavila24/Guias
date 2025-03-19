@@ -8,9 +8,23 @@ uname -m
 - `x86_64`: 64 bits (habilita multiarch)
 - `i686`: 32 bits (sin cambios)
 
-## 2. Instalación mediante scripts
+## 2. Descargar archivos necesarios
 
-Descarga o prepara los siguientes archivos en la carpeta `Oracle10gXE`:
+Descarga la carpeta llamada `Oracle10gXE` usando el siguiente comando desde la terminal:
+
+```bash
+wget -O Oracle10gXE.zip "https://www.dropbox.com/scl/fi/scmu10zr2zfzwh9mkje6z/Oracle10gXE.zip?rlkey=xyl0606by1fjw5jy7rpv4qszk&st=cr718ejs&dl=1"
+```
+
+Luego, extrae los archivos:
+
+```bash
+unzip Oracle10gXE.zip
+```
+
+## 3. Instalación mediante scripts
+
+Dentro de la carpeta `Oracle10gXE/Linux-DEB`, asegúrate de tener estos archivos:
 - `oracle-xe-universal_10.2.0.1-1.1_i386.deb`
 - `oracle-xe-client_10.2.0.1-1.2_i386.deb`
 - `libaio_0.3.104-1_i386.deb`
@@ -52,6 +66,10 @@ sudo dpkg -i --force-architecture \
 echo "Corrigiendo posibles dependencias faltantes..."
 sudo apt --fix-broken install -y
 
+# Instalar rlwrap para mejorar la experiencia en SQL*Plus
+echo "Instalando rlwrap para mejorar la experiencia en SQL*Plus..."
+sudo apt-get install -y rlwrap
+
 # Configurar Oracle XE
 echo "Configurando Oracle XE..."
 sudo /etc/init.d/oracle-xe configure
@@ -63,16 +81,27 @@ echo "export ORACLE_SID=XE" >> ~/.bashrc
 echo "export PATH=\$PATH:\$ORACLE_HOME/bin" >> ~/.bashrc
 echo "unset TWO_TASK" >> ~/.bashrc
 
+# Añadir alias para usar rlwrap automáticamente con sqlplus
+echo "Configurando alias para sqlplus..."
+echo "alias sqlplus='rlwrap sqlplus'" >> ~/.bashrc
+
 # Recargar el archivo .bashrc
 source ~/.bashrc
 
+# Mensaje final con ejemplos de uso
 echo "Instalación y configuración completadas."
+echo ""
+echo "Para iniciar sesión en SQL*Plus, usa los siguientes comandos:"
+echo "  sqlplus SYS/tu_contraseña AS SYSDBA"
+echo "  sqlplus SYSTEM/tu_contraseña"
+echo ""
+echo "El alias 'sqlplus' ya está configurado para usar rlwrap automáticamente."
 ```
 
 ### Ejecución de scripts:
 
 ```bash
-cd /ruta/Oracle10gXE
+cd Oracle10gXE/Linux-DEB
 chmod +x multiarch-setup.sh oracle-xe-install.sh
 
 # Solo si es necesario (sistema 64 bits)
@@ -82,7 +111,7 @@ chmod +x multiarch-setup.sh oracle-xe-install.sh
 ./oracle-xe-install.sh
 ```
 
-## 3. Arrancar, detener y verificar Oracle XE
+## 4. Arrancar, detener y verificar Oracle XE
 
 ```bash
 sudo /etc/init.d/oracle-xe start    # Iniciar
@@ -90,32 +119,46 @@ sudo /etc/init.d/oracle-xe stop     # Detener
 ps -ef | grep oracle                # Verificar procesos
 ```
 
-## 4. Configura acceso a SQL*Plus con `rlwrap` (Optimizado)
+---
 
-`rlwrap` mejora la experiencia al usar SQL*Plus:
+## 5. Ejemplos de cómo iniciar sesión en SQL*Plus
 
-### Instalación:
+Una vez completada la instalación y configuración, puedes iniciar sesión en SQL*Plus usando el alias `sqlplus`, que ya incluye `rlwrap` automáticamente. Aquí tienes algunos ejemplos:
+
+### Iniciar sesión como `SYS` (usuario administrador):
 ```bash
-sudo apt-get install rlwrap
+sqlplus SYS/tu_contraseña AS SYSDBA
 ```
 
-### Configuración permanente:
-Edita el archivo `~/.zshrc` o `~/.bashrc` según tu shell (`zsh` recomendado):
+### Iniciar sesión como `SYSTEM` (usuario administrativo):
 ```bash
-nano ~/.zshrc
+sqlplus SYSTEM/tu_contraseña
 ```
 
-Agrega el alias:
+### Iniciar sesión con un usuario creado:
+Si has creado un usuario (por ejemplo, `nuevo_usuario`), puedes iniciar sesión de la siguiente manera:
 ```bash
-alias sqlplus='rlwrap sqlplus'
+sqlplus nuevo_usuario/contraseña
 ```
 
-Guarda y aplica cambios:
-```bash
-source ~/.zshrc
+### Verificar la conexión:
+Una vez dentro de SQL*Plus, puedes ejecutar consultas SQL para verificar que todo funciona correctamente. Por ejemplo:
+```sql
+SELECT * FROM v$version;
 ```
 
-## 5. Gestión básica de usuarios
+---
+
+### Notas adicionales:
+- El alias `sqlplus` ya está configurado para usar `rlwrap`, lo que permite navegar por el historial de comandos y mejorar la experiencia en la línea de comandos.
+- Si necesitas desactivar `rlwrap` temporalmente, puedes usar el comando completo:
+  ```bash
+  /usr/lib/oracle/xe/app/oracle/product/10.2.0/server/bin/sqlplus
+  ```
+
+---
+
+## 6. Gestión básica de usuarios
 
 ```sql
 -- Crear usuario
@@ -136,37 +179,35 @@ SELECT table_name FROM user_tables;
 DROP USER nuevo_usuario CASCADE;
 ```
 
-## 6. Script adicional para SQL*Plus (`login.sql`)
+---
 
-Crea un archivo llamado `login.sql` con el siguiente contenido para mejorar automáticamente tu experiencia en SQL*Plus:
+## 7. Configuración automática para SQL*Plus (`login.sql`)
+
+Crea un archivo llamado **`login.sql`** con el siguiente contenido mejorado, el cual establece automáticamente un formato claro y legible cada vez que inicies sesión en SQL*Plus:
 
 ```sql
--- login.sql - configuración automática para SQL*Plus
+-- login.sql - configuración automática mejorada para SQL*Plus
 
--- Configuración visual
 SET LINESIZE 200
-SET PAGESIZE 100
-SET WRAP ON
-SET FEEDBACK OFF
+SET PAGESIZE 50
+SET WRAP OFF
+SET FEEDBACK ON
 SET TRIMSPOOL ON
 SET VERIFY OFF
+SET COLSEP ' | '
+SET HEADING ON
+SET NULL 'N/A'
 
--- Formato predeterminado para columnas comunes
-COLUMN ISBN FORMAT A20
-COLUMN TITULO FORMAT A100
-COLUMN table_name FORMAT A30
-COLUMN tablespace_name FORMAT A20
-COLUMN status FORMAT A10
-COLUMN num_rows FORMAT 999,999
-COLUMN last_analyzed FORMAT A20
+ALTER SESSION SET NLS_DATE_FORMAT='DD-MON-YYYY HH24:MI';
 
--- Mensaje inicial personalizado
-PROMPT **************************************
-PROMPT * Bienvenido a SQL*Plus (biblioteca) *
-PROMPT **************************************
+PROMPT *********************************************************
+PROMPT *            Bienvenido a SQL*Plus (Biblioteca)         *
+PROMPT *                                                       *
+PROMPT * Configuración automática cargada correctamente        *
+PROMPT *********************************************************
 ```
 
-Guárdalo en la misma ubicación desde donde ejecutas SQL*Plus, para que se cargue automáticamente al iniciar.
+Guarda el archivo `login.sql` en el directorio desde el cual ejecutas SQL*Plus para que la configuración se cargue automáticamente al iniciar cada sesión. Esto facilitará la lectura, análisis y presentación de los resultados en tus consultas SQL.
 
 ## Nota final
 - Oracle XE 10g funciona en sistemas modernos usando multiarch.
