@@ -150,9 +150,47 @@ SELECT table_name FROM user_tables;
 DROP USER nuevo_usuario CASCADE;
 ```
 
-## 7. Script adicional para SQL*Plus (`login.sql`)
+---
 
-Crea un archivo llamado `login.sql` con el contenido especificado anteriormente en esta guía y guárdalo en la misma ubicación desde donde ejecutas SQL*Plus para que se cargue automáticamente al iniciar.
+## 7. Configuración automática para SQL*Plus (`login.sql`)
+
+Crea un archivo llamado **`login.sql`** con el siguiente contenido mejorado, el cual establece automáticamente un formato claro y legible cada vez que inicies sesión en SQL*Plus:
+
+```sql
+-- login.sql - configuración automática mejorada para SQL*Plus
+
+-- Configuración visual
+SET LINESIZE 250
+SET PAGESIZE 500
+SET WRAP ON
+SET FEEDBACK ON
+SET TRIMSPOOL ON
+SET VERIFY OFF
+SET COLSEP ' | '
+SET HEADING ON
+
+-- Formato predeterminado mejorado para columnas comunes
+COLUMN ISBN FORMAT A20 HEADING 'ISBN'
+COLUMN TITULO FORMAT A60 HEADING 'Título'
+COLUMN AUTOR FORMAT A40 HEADING 'Autor'
+COLUMN table_name FORMAT A30 HEADING 'Nombre de Tabla'
+COLUMN tablespace_name FORMAT A20 HEADING 'Tablespace'
+COLUMN status FORMAT A10 HEADING 'Estado'
+COLUMN num_rows FORMAT 999,999,999 HEADING 'Número de Filas'
+COLUMN last_analyzed FORMAT A20 HEADING 'Último Análisis'
+
+-- Formato estándar para fechas
+ALTER SESSION SET NLS_DATE_FORMAT='DD-MON-YYYY HH24:MI';
+
+-- Mensaje inicial personalizado y ordenado visualmente
+PROMPT *********************************************************
+PROMPT *            Bienvenido a SQL*Plus (Biblioteca)         *
+PROMPT *                                                       *
+PROMPT * Configuración automática cargada correctamente        *
+PROMPT *********************************************************
+```
+
+Guarda el archivo `login.sql` en el directorio desde el cual ejecutas SQL*Plus para que la configuración se cargue automáticamente al iniciar cada sesión. Esto facilitará la lectura, análisis y presentación de los resultados en tus consultas SQL.
 
 ## Nota final
 - Oracle XE 10g funciona en sistemas modernos usando multiarch.
