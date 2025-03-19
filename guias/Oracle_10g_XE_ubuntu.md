@@ -1,4 +1,4 @@
-# Guía de Instalación y Configuración de Oracle XE 10g en Linux
+# Guía de Instalación y Configuración de Oracle XE 10g en Ubuntu
 
 ## 1. Verifica la arquitectura del sistema
 
