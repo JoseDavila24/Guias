@@ -1,6 +1,6 @@
 # Guía Optimizada de Instalación y Configuración de Oracle XE 10g en Ubuntu
 
-## Importante: Actualización del Sistema
+### Importante: Actualización del Sistema
 **Descripción:**  
 Actualiza el sistema para asegurarte de contar con las últimas mejoras y parches de seguridad.
 
