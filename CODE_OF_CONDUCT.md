@@ -17,7 +17,7 @@ Este proyecto se rige por un código de conducta para garantizar un ambiente abi
 
 ## Reportes
 
-Si observas o eres víctima de un comportamiento inapropiado, por favor abre un issue privado (si está habilitado).
+Si observas o eres víctima de un comportamiento inapropiado, por favor abre un issue privado.
 
 ## Consecuencias
 
