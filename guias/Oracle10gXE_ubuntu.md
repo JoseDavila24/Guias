@@ -1,5 +1,18 @@
 # Guía Optimizada de Instalación y Configuración de Oracle XE 10g en Ubuntu
 
+## Importante: Actualización del Sistema
+**Descripción:**  
+Actualiza el sistema para asegurarte de contar con las últimas mejoras y parches de seguridad.
+
+**Comando:**
+```bash
+sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y && sudo apt clean
+```
+- 🔄 *apt update:* Actualiza la lista de paquetes.  
+- ⬆️ *apt full-upgrade:* Instala todas las actualizaciones disponibles.  
+- 🧹 *apt autoremove:* Elimina paquetes innecesarios.  
+- 🗑️ *apt clean:* Limpia archivos temporales.
+
 ## 1. Verifica la arquitectura del sistema
 
 ```bash
