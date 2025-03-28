@@ -1,4 +1,4 @@
-# 📚 Guía Rápida de Uso de Git + Flujo de Trabajo
+# 📚 Bienvenido a mis guias
 
 Este repositorio incluye **varias guías** sobre procesos que pueden ser útiles durante tu vida estudiantil.  
 Pero antes de comenzar a explorarlas, es importante que tengas claro el concepto y el uso básico de **Git**.
