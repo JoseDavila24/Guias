@@ -86,10 +86,3 @@ Tipos válidos: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 ## Código de conducta
 
 Este proyecto sigue un [Código de Conducta](./CODE_OF_CONDUCT.md) para asegurar un entorno colaborativo, seguro y respetuoso para todos. Por favor, léelo antes de contribuir.
-
----
-
-¡Gracias por hacer que este proyecto sea mejor! 🙌
-```
-
----
