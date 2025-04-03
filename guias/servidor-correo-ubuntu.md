@@ -165,15 +165,17 @@ SquirrelMail es la aplicación web para gestionar los correos. Se descarga manua
    ```bash
    cd /var/www/html/
    ```
-2. Descarga y descomprime SquirrelMail:
+2. Si no tienes unzip, instala `unzip`:
+   ```bash
+   sudo apt install unzip
+   ```
+   
+3. Descarga y descomprime SquirrelMail:
    ```bash
    sudo wget https://sourceforge.net/projects/squirrelmail/files/stable/1.4.22/squirrelmail-webmail-1.4.22.zip
    sudo unzip squirrelmail-webmail-1.4.22.zip
    ```
-3. Si es necesario, instala `unzip`:
-   ```bash
-   sudo apt install unzip
-   ```
+
 4. Renombra la carpeta:
    ```bash
    sudo mv squirrelmail-webmail-1.4.22 squirrelmail
