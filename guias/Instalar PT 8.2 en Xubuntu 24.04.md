@@ -1,4 +1,4 @@
-# 📘 Guía Completa de Instalación
+# 🏗️ Guía Completa de Instalación
 
 ## Cisco Packet Tracer 8.2.2 en Xubuntu 24.04.2 LTS (64 bits)
 
