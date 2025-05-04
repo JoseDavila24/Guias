@@ -1,228 +1,145 @@
-# Guía Optimizada de Instalación y Configuración de Oracle XE 10g en Ubuntu
+# 📘 Guía Completa de Instalación
 
-### Importante: Actualización del Sistema
-**Descripción:**  
-Actualiza el sistema para asegurarte de contar con las últimas mejoras y parches de seguridad.
+## Cisco Packet Tracer 8.2.2 en Xubuntu 24.04.2 LTS (64 bits)
 
-**Comando:**
+---
+
+## ⚠️ Importante: Actualización del Sistema
+
+**Descripción:**
+Antes de instalar cualquier software, es recomendable actualizar el sistema para asegurarte de contar con las últimas mejoras, correcciones y parches de seguridad.
+
+### Comando:
+
 ```bash
 sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y && sudo apt clean
 ```
-- 🔄 *apt update:* Actualiza la lista de paquetes.  
-- ⬆️ *apt full-upgrade:* Instala todas las actualizaciones disponibles.  
-- 🧹 *apt autoremove:* Elimina paquetes innecesarios.  
-- 🗑️ *apt clean:* Limpia archivos temporales.
 
-## 1. Verifica la arquitectura del sistema
+### ¿Qué hace cada parte?
 
-```bash
-uname -m
-```
-- `x86_64`: 64 bits (habilita multiarch)
-- `i686`: 32 bits (sin cambios)
+* 🔄 `apt update`: Actualiza la lista de paquetes disponibles.
+* ⬆️ `apt full-upgrade`: Instala todas las actualizaciones disponibles, incluyendo las que requieren cambios en dependencias.
+* 🧹 `apt autoremove`: Elimina paquetes que ya no son necesarios.
+* 🗑️ `apt clean`: Borra archivos temporales del gestor de paquetes.
 
-## 2. Descargar archivos necesarios
+---
 
-Descarga la carpeta llamada `Oracle10gXE` usando el siguiente comando desde la terminal:
+## 🔽 Paso 1: Descargar el archivo ZIP desde Dropbox
+
+Usa `wget` para descargar el archivo comprimido con los instaladores:
 
 ```bash
-wget -O Oracle10gXE.zip "https://www.dropbox.com/scl/fi/scmu10zr2zfzwh9mkje6z/Oracle10gXE.zip?rlkey=xyl0606by1fjw5jy7rpv4qszk&st=cr718ejs&dl=1"
+wget -O CiscoPacketTracer822.zip "https://www.dropbox.com/scl/fi/jyc0jg98sg551di9ecji3/CiscoPacketTracer822.zip?rlkey=rzx52qc4mycsfursupjn7x6sl&st=zbe2ql4j&dl=1"
 ```
 
-Luego, extrae los archivos:
+---
+
+## 📂 Paso 2: Extraer los archivos `.deb`
+
+Descomprime el archivo ZIP descargado:
 
 ```bash
-unzip Oracle10gXE.zip
+unzip CiscoPacketTracer822.zip
 ```
 
-## 3. Instalación mediante scripts
+Deberías obtener estos tres archivos:
 
-Dentro de la carpeta `Oracle10gXE/Linux-DEB`, asegúrate de tener estos archivos:
-- `oracle-xe-universal_10.2.0.1-1.1_i386.deb`
-- `oracle-xe-client_10.2.0.1-1.2_i386.deb`
-- `libaio_0.3.104-1_i386.deb`
+* `CiscoPacketTracer822_amd64_signed.deb`
+* `libgl1-mesa-glx_23.0.4-0ubuntu1.22.04.1_amd64.deb`
+* `libegl1-mesa_23.0.4-0ubuntu1.22.04.1_amd64.deb`
 
-Luego, crea los siguientes scripts en la misma carpeta:
+---
 
-### Script 1: `multiarch-setup.sh` (Solo para sistemas de 64 bits)
+## ⚙️ Paso 3: Instalar dependencias del sistema
+
+Ejecuta este comando para instalar las bibliotecas necesarias:
+
+```bash
+sudo apt install libnss3 libxslt1.1 libxss1 libpulse0 \
+                 libxcb-xinerama0 libxcb-icccm4 libxcb-image0 \
+                 libxcb-keysyms1 libxcb-render-util0 libxkbcommon-x11-0 unzip wget
+```
+
+---
+
+## 🧱 Paso 4: Instalar bibliotecas gráficas requeridas
+
+Instala las bibliotecas gráficas que Packet Tracer necesita para funcionar correctamente:
+
+```bash
+sudo dpkg -i libegl1-mesa_23.0.4-0ubuntu1.22.04.1_amd64.deb
+sudo dpkg -i libgl1-mesa-glx_23.0.4-0ubuntu1.22.04.1_amd64.deb
+sudo apt --fix-broken install
+```
+
+---
+
+## 📦 Paso 5: Instalar Cisco Packet Tracer
+
+Instala el paquete `.deb` principal:
+
+```bash
+sudo dpkg -i CiscoPacketTracer822_amd64_signed.deb
+sudo apt --fix-broken install
+```
+
+Durante la instalación, acepta la licencia cuando se te solicite.
+
+---
+
+## ❗ Paso 6: Solucionar error Qt (plugin "xcb")
+
+Si al ejecutar Packet Tracer aparece este error:
+
+```
+Fatal: This application failed to start because no Qt platform plugin could be initialized.
+```
+
+Ejecuta el programa con las variables necesarias:
+
+```bash
+cd /opt/pt/bin
+export QT_QPA_PLATFORM_PLUGIN_PATH=/opt/pt/plugins/platforms
+LD_LIBRARY_PATH=/opt/pt/bin ./PacketTracer
+```
+
+---
+
+## 🚀 Paso 7: Crear lanzador de acceso rápido (opcional)
+
+Para poder ejecutar Packet Tracer fácilmente desde cualquier terminal:
+
+1. Crea un archivo de script:
+
+```bash
+sudo nano /usr/local/bin/packettracer
+```
+
+2. Pega lo siguiente:
 
 ```bash
 #!/bin/bash
-
-ARCH=$(uname -m)
-
-if [ "$ARCH" = "x86_64" ]; then
-    echo "Sistema de 64 bits detectado. Habilitando soporte para i386..."
-    sudo dpkg --add-architecture i386
-    sudo apt-get update
-    echo "Instalando dependencias necesarias para i386..."
-    sudo apt-get install -y libaio1:i386
-    sudo apt --fix-broken install -y
-else
-    echo "Sistema de 32 bits detectado. No es necesario realizar cambios adicionales."
-fi
+export QT_QPA_PLATFORM_PLUGIN_PATH=/opt/pt/plugins/platforms
+export LD_LIBRARY_PATH=/opt/pt/bin
+exec /opt/pt/bin/PacketTracer "$@"
 ```
 
-### Script 2: `oracle-xe-install.sh`
+3. Guarda y hazlo ejecutable:
 
 ```bash
-#!/bin/bash
-
-# Instalar paquetes .deb con --force-architecture
-echo "Instalando paquetes de Oracle XE..."
-sudo dpkg -i --force-architecture \
-    libaio_0.3.104-1_i386.deb \
-    oracle-xe-client_10.2.0.1-1.2_i386.deb \
-    oracle-xe-universal_10.2.0.1-1.1_i386.deb
-
-# Corregir posibles dependencias faltantes
-echo "Corrigiendo posibles dependencias faltantes..."
-sudo apt --fix-broken install -y
-
-# Instalar rlwrap para mejorar la experiencia en SQL*Plus
-echo "Instalando rlwrap para mejorar la experiencia en SQL*Plus..."
-sudo apt-get install -y rlwrap
-
-# Configurar Oracle XE
-echo "Configurando Oracle XE..."
-sudo /etc/init.d/oracle-xe configure
-
-# Ajustar variables de entorno
-echo "Configurando variables de entorno..."
-echo "export ORACLE_HOME=/usr/lib/oracle/xe/app/oracle/product/10.2.0/server" >> ~/.bashrc
-echo "export ORACLE_SID=XE" >> ~/.bashrc
-echo "export PATH=\$PATH:\$ORACLE_HOME/bin" >> ~/.bashrc
-echo "unset TWO_TASK" >> ~/.bashrc
-
-# Añadir alias para usar rlwrap automáticamente con sqlplus
-echo "Configurando alias para sqlplus..."
-echo "alias sqlplus='rlwrap sqlplus'" >> ~/.bashrc
-
-# Recargar el archivo .bashrc
-source ~/.bashrc
-
-# Mensaje final con ejemplos de uso
-echo "Instalación y configuración completadas."
-echo ""
-echo "Para iniciar sesión en SQL*Plus, usa los siguientes comandos:"
-echo "  sqlplus SYS/tu_contraseña AS SYSDBA"
-echo "  sqlplus SYSTEM/tu_contraseña"
-echo ""
-echo "El alias 'sqlplus' ya está configurado para usar rlwrap automáticamente."
+sudo chmod +x /usr/local/bin/packettracer
 ```
 
-### Ejecución de scripts:
+Ahora puedes ejecutar Packet Tracer desde cualquier lugar con:
 
 ```bash
-cd Oracle10gXE/Linux-DEB
-chmod +x multiarch-setup.sh oracle-xe-install.sh
-
-# Solo si es necesario (sistema 64 bits)
-./multiarch-setup.sh
-
-# Instalación y configuración Oracle XE
-./oracle-xe-install.sh
-```
-
-## 4. Arrancar, detener y verificar Oracle XE
-
-```bash
-sudo /etc/init.d/oracle-xe start    # Iniciar
-sudo /etc/init.d/oracle-xe stop     # Detener
-ps -ef | grep oracle                # Verificar procesos
+packettracer
 ```
 
 ---
 
-## 5. Ejemplos de cómo iniciar sesión en SQL*Plus
+## ✅ ¡Instalación Completada!
 
-Una vez completada la instalación y configuración, puedes iniciar sesión en SQL*Plus usando el alias `sqlplus`, que ya incluye `rlwrap` automáticamente. Aquí tienes algunos ejemplos:
+Cisco Packet Tracer 8.2.2 ya está instalado y funcionando en tu sistema Xubuntu 24.04.2 LTS (64 bits).
 
-### Iniciar sesión como `SYS` (usuario administrador):
-```bash
-sqlplus SYS/tu_contraseña AS SYSDBA
-```
-
-### Iniciar sesión como `SYSTEM` (usuario administrativo):
-```bash
-sqlplus SYSTEM/tu_contraseña
-```
-
-### Iniciar sesión con un usuario creado:
-Si has creado un usuario (por ejemplo, `nuevo_usuario`), puedes iniciar sesión de la siguiente manera:
-```bash
-sqlplus nuevo_usuario/contraseña
-```
-
-### Verificar la conexión:
-Una vez dentro de SQL*Plus, puedes ejecutar consultas SQL para verificar que todo funciona correctamente. Por ejemplo:
-```sql
-SELECT * FROM v$version;
-```
-
----
-
-### Notas adicionales:
-- El alias `sqlplus` ya está configurado para usar `rlwrap`, lo que permite navegar por el historial de comandos y mejorar la experiencia en la línea de comandos.
-- Si necesitas desactivar `rlwrap` temporalmente, puedes usar el comando completo:
-  ```bash
-  /usr/lib/oracle/xe/app/oracle/product/10.2.0/server/bin/sqlplus
-  ```
-
----
-
-## 6. Gestión básica de usuarios
-
-```sql
--- Crear usuario
-CREATE USER nuevo_usuario IDENTIFIED BY contraseña;
-GRANT CONNECT, RESOURCE TO nuevo_usuario;
-
--- Dar todos los privilegios al usuario
-GRANT ALL PRIVILEGES TO nuevo_usuario;
-
--- Ver usuarios y roles
-SELECT * FROM dba_users;
-SELECT * FROM dba_roles;
-
--- Tablas del usuario actual
-SELECT table_name FROM user_tables;
-
--- Eliminar usuario
-DROP USER nuevo_usuario CASCADE;
-```
-
----
-
-## 7. Configuración automática para SQL*Plus (`login.sql`)
-
-Crea un archivo llamado **`login.sql`** con el siguiente contenido mejorado, el cual establece automáticamente un formato claro y legible cada vez que inicies sesión en SQL*Plus:
-
-```sql
--- login.sql - configuración automática mejorada para SQL*Plus
-
-SET LINESIZE 200
-SET PAGESIZE 50
-SET WRAP OFF
-SET FEEDBACK ON
-SET TRIMSPOOL ON
-SET VERIFY OFF
-SET COLSEP ' | '
-SET HEADING ON
-SET NULL 'N/A'
-
-ALTER SESSION SET NLS_DATE_FORMAT='DD-MON-YYYY HH24:MI';
-
-PROMPT *********************************************************
-PROMPT *            Bienvenido a SQL*Plus (Biblioteca)         *
-PROMPT *                                                       *
-PROMPT * Configuración automática cargada correctamente        *
-PROMPT *********************************************************
-```
-
-Guarda el archivo `login.sql` en el directorio desde el cual ejecutas SQL*Plus para que la configuración se cargue automáticamente al iniciar cada sesión. Esto facilitará la lectura, análisis y presentación de los resultados en tus consultas SQL.
-
-## Nota final
-- Oracle XE 10g funciona en sistemas modernos usando multiarch.
-- Considera una máquina virtual, Docker o contenedores LXD como alternativa recomendada para aislar Oracle XE 10g y evitar conflictos futuros con la arquitectura i386, especialmente cuando se trabaja en un host Ubuntu.
-
+📌 Consejo: Si actualizas tu sistema o el programa, asegúrate de verificar que todas las dependencias necesarias estén presentes.
