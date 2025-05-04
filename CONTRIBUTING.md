@@ -1,191 +1,92 @@
-# 📘 GUÍA DE USO Y CONTRIBUCIÓN CON GIT
+# 📘 GUÍA PARA CONTRIBUIR AL PROYECTO Y USAR GIT
 
-Este documento te ofrece una introducción práctica a Git y una guía clara para contribuir al proyecto de manera efectiva, profesional y colaborativa.
-
----
-
-## 🔹 A. ¿QUÉ ES GIT?
-
-**Git** es un sistema de control de versiones distribuido que permite:
-
-* Gestionar el historial de cambios de tus proyectos.
-* Trabajar con otras personas sin sobrescribir el trabajo de nadie.
-* Recuperar versiones anteriores si algo sale mal.
-
-👉 En resumen: te brinda **control**, **seguridad** y **colaboración**.
+Este documento está dirigido a todos los colaboradores que deseen formar parte activa del desarrollo de este proyecto. Aquí encontrarás tanto la base para trabajar con Git como las normas y procesos para contribuir de forma clara, ordenada y efectiva.
 
 ---
 
-## 🔹 B. CONFIGURACIÓN INICIAL
+## 🤝 A. CONTRIBUIR ES COLABORAR
 
-### 1. INSTALAR GIT
+¡Gracias por tu interés en contribuir!
+Nuestro objetivo es mantener un entorno colaborativo donde todos puedan aportar, crecer y mejorar el proyecto en conjunto. Para ello:
 
-**En Ubuntu/Linux:**
-
-```bash
-sudo apt update && sudo apt install git
-```
-
-**En Windows:**
-
-1. Descarga Git para Windows desde: [https://git-scm.com/downloads](https://git-scm.com/downloads)
-2. Instala con las opciones por defecto.
-3. Abre Git Bash y verifica:
-
-```bash
-git --version
-```
-
-### 2. CONFIGURAR TU IDENTIDAD
-
-Esto es necesario para que tus cambios se registren correctamente.
-
-```bash
-git config --global user.name "Tu Nombre"
-git config --global user.email "tuemail@example.com"
-```
-
-Puedes verificar tu configuración con:
-
-```bash
-git config --list
-```
+* Promovemos **colaboración constante** entre desarrolladores.
+* Buscamos **transparencia y trazabilidad** en todos los cambios.
+* Valoramos el **respeto, la claridad y el orden** en el trabajo en equipo.
 
 ---
 
-## 🔹 C. FLUJO DE TRABAJO DIARIO CON GIT
+## 🧾 B. PROCESO DE CONTRIBUCIÓN
 
-### 1. CLONAR EL REPOSITORIO
+### 1. FORK Y CLONACIÓN
+
+1. Haz un **fork** del repositorio original.
+2. Clona tu copia a tu entorno local:
 
 ```bash
 git clone https://github.com/tu-usuario/nombre-del-repo.git
 cd nombre-del-repo
 ```
 
-### 2. CREAR UNA NUEVA RAMA
+### 2. CREAR UNA RAMA DE TRABAJO
+
+Siempre trabaja sobre una rama distinta a `main`. Usa nombres descriptivos:
 
 ```bash
-git checkout -b nombre-de-tu-rama
+git checkout -b feature/nueva-funcionalidad
 ```
 
-### 3. HACER CAMBIOS Y AGREGARLOS
+### 3. REALIZA CAMBIOS Y CONFÍRMALOS
 
-```bash
-git add .
-```
-
-*También puedes agregar archivos específicos:*
-
-```bash
-git add archivo.txt
-```
-
-### 4. CONFIRMAR LOS CAMBIOS (COMMIT)
-
-```bash
-git commit -m "Descripción breve del cambio"
-```
-
-Ejemplo:
-
-```bash
-git commit -m "fix: corrige validación del formulario"
-```
-
-### 5. SUBIR CAMBIOS AL REPOSITORIO REMOTO
-
-```bash
-git push origin nombre-de-tu-rama
-```
-
----
-
-## 🔄 D. FUSIONAR CAMBIOS (PULL REQUEST)
-
-1. Entra a tu repositorio en GitHub.
-2. Crea un Pull Request desde tu rama hacia `main`.
-3. Agrega una descripción breve y clara del cambio.
-4. Solicita revisión y fusión.
-
-Para actualizar tu rama local:
-
-```bash
-git checkout main
-git pull origin main
-git branch -d nombre-de-tu-rama
-```
-
----
-
-## 🔸 E. COMANDOS ÚTILES
-
-| Acción                     | Comando                    |
-| -------------------------- | -------------------------- |
-| Ver estado de cambios      | `git status`               |
-| Ver historial de commits   | `git log --oneline`        |
-| Ver ramas disponibles      | `git branch`               |
-| Cambiar de rama            | `git checkout nombre-rama` |
-| Guardar cambios temporales | `git stash`                |
-
----
-
-## 🤝 F. GUÍA PARA CONTRIBUIR AL PROYECTO
-
-### 1. CÓMO CONTRIBUIR
-
-1. Haz un **fork** del repositorio.
-2. Clona tu fork localmente:
-
-```bash
-git clone https://github.com/tu-usuario/nombre-del-repo.git
-cd nombre-del-repo
-```
-
-3. Crea una nueva rama:
-
-```bash
-git checkout -b nombre-de-tu-rama
-```
-
-4. Realiza tus cambios:
+Haz tus modificaciones, asegúrate de que el código funcione, y luego:
 
 ```bash
 git add .
-git commit -m "Descripción clara del cambio"
+git commit -m "feat: agrega validación en formulario"
 ```
 
-5. Sube tu rama:
+> 📌 Es importante que el mensaje de commit sea **claro y específico**.
+
+### 4. HAZ PUSH Y ENVÍA TU CONTRIBUCIÓN
 
 ```bash
-git push origin nombre-de-tu-rama
+git push origin feature/nueva-funcionalidad
 ```
 
-6. Abre un **Pull Request** hacia `main`.
+Después, abre un **Pull Request (PR)** desde tu rama hacia `main`.
+Incluye en la descripción:
+
+* Qué hiciste.
+* Por qué lo hiciste.
+* Si el PR cierra un issue: `Closes #número`.
 
 ---
 
-### 2. BUENAS PRÁCTICAS
+## 🧠 C. BUENAS PRÁCTICAS DE CONTRIBUCIÓN
 
-* Escribe código limpio, documentado y comprensible.
-* Añade pruebas si es necesario.
-* Verifica que no rompes funcionalidades existentes.
-* Usa nombres descriptivos para ramas y commits.
+* ✅ **Escribe código limpio**, comentado y con nombres descriptivos.
+* ✅ **No alteres funcionalidades existentes** sin justificación.
+* ✅ **Agrega pruebas** si introduces nueva lógica.
+* ✅ **Documenta** todo lo necesario para otros desarrolladores.
 
----
-
-### 3. ESTRUCTURA DE RAMAS
-
-* `main`: versión estable del proyecto.
-* `develop`: versión en desarrollo (opcional).
-* `feature/*`: nuevas funcionalidades.
-* `fix/*`: corrección de errores.
-* `docs/*`: documentación.
+> Tu aporte no solo es código, también es contexto y claridad para el equipo.
 
 ---
 
-### 4. COMMITS CLAROS
+## 🌿 D. ESTRUCTURA DE RAMAS
 
-Utiliza esta estructura para tus mensajes:
+Utilizamos una estructura de ramas sencilla y efectiva:
+
+* `main`: versión estable.
+* `develop`: integración de nuevas funcionalidades (si aplica).
+* `feature/*`: nuevas características.
+* `fix/*`: correcciones de errores.
+* `docs/*`: cambios en documentación.
+
+---
+
+## ✍️ E. COMMIT CLAROS Y CONSISTENTES
+
+Usa esta convención en tus commits:
 
 ```
 tipo: descripción breve del cambio
@@ -194,36 +95,87 @@ tipo: descripción breve del cambio
 Ejemplos:
 
 * `feat: agrega componente de usuario`
-* `fix: corrige error en el login`
-* `docs: actualiza el README`
+* `fix: corrige error de validación`
+* `docs: actualiza guía de contribución`
 
 Tipos válidos: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`.
 
 ---
 
-### 5. PULL REQUESTS
+## 🔄 F. GESTIÓN DE PULL REQUESTS
 
-* Describe qué hiciste.
-* Indica si algo requiere atención especial.
-* Relaciona el PR con un issue si aplica (ejemplo: `Closes #3`).
+Cuando envíes un Pull Request:
+
+* Explica **qué problema resuelve** tu contribución.
+* Menciona si **necesita revisión específica**.
+* Mantente disponible para responder comentarios o hacer ajustes.
 
 ---
 
-### 6. CÓDIGO DE CONDUCTA
+## ⚖️ G. CÓDIGO DE CONDUCTA
 
-Este proyecto sigue un **Código de Conducta** que promueve un entorno inclusivo, respetuoso y colaborativo.
-Por favor, revísalo antes de enviar tu contribución.
+Este proyecto sigue un **Código de Conducta** para garantizar un ambiente:
+
+* Respetuoso
+* Colaborativo
+* Seguro para todos
+
+Léelo antes de contribuir. Tu participación responsable fortalece la comunidad.
+
+---
+
+## 🔧 H. GUÍA BÁSICA DE GIT PARA CONTRIBUIDORES
+
+Si eres nuevo en Git, aquí tienes lo esencial:
+
+### INSTALACIÓN Y CONFIGURACIÓN
+
+**Ubuntu/Linux:**
+
+```bash
+sudo apt update && sudo apt install git
+```
+
+**Windows:**
+
+* Descarga desde [https://git-scm.com/downloads](https://git-scm.com/downloads)
+* Instala y abre Git Bash
+
+**Configura tu identidad:**
+
+```bash
+git config --global user.name "Tu Nombre"
+git config --global user.email "tucorreo@example.com"
+```
+
+### FLUJO RESUMIDO
+
+```bash
+# Clonar repositorio
+git clone https://github.com/tu-usuario/nombre-del-repo.git
+
+# Crear rama
+git checkout -b fix/ajuste-login
+
+# Hacer cambios
+git add .
+git commit -m "fix: corrige validación en login"
+
+# Enviar contribución
+git push origin fix/ajuste-login
+```
 
 ---
 
 ## ✅ RECOMENDACIONES FINALES
 
-* Crea una rama por cada nueva función o corrección.
-* Escribe mensajes de commit descriptivos y consistentes.
-* Haz `pull` frecuentemente para evitar conflictos.
-* Usa `.gitignore` para omitir archivos innecesarios.
+* 🔄 Haz `git pull` frecuentemente para mantener tu rama actualizada.
+* ✏️ Sé detallado en tus mensajes y en las descripciones de los PR.
+* 🧼 Usa `.gitignore` para no subir archivos innecesarios.
+* 🙌 Colabora de manera abierta: tu trabajo impacta a todo el equipo.
 
 ---
 
-Con esta guía completa ya puedes contribuir de manera ordenada, profesional y efectiva.
-¡Gracias por formar parte del proyecto! 🚀
+**Tu contribución cuenta.**
+Ya sea pequeña o grande, cada mejora suma al valor del proyecto.
+Gracias por ser parte de esta comunidad. ¡Vamos a construir juntos algo increíble! 🚀
