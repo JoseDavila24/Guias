@@ -70,18 +70,25 @@ Verifica que existan estos archivos `.deb`:
 ```bash
 #!/bin/bash
 ARCH=$(uname -m)
+
 if [ "$ARCH" = "x86_64" ]; then
-    echo "Sistema de 64 bits detectado. Habilitando soporte para i386..."
+    echo "🔍 Sistema de 64 bits detectado. Habilitando soporte para i386..."
     sudo dpkg --add-architecture i386
     sudo apt update
-    echo "Instalando dependencias necesarias para arquitectura i386..."
-    sudo apt install -y libaio1:i386
+
+    echo "📦 Instalando dependencias necesarias desde archivo local..."
+    if [ -f libaio_0.3.104-1_i386.deb ]; then
+        sudo dpkg -i libaio_0.3.104-1_i386.deb
+    else
+        echo "❌ Archivo libaio_0.3.104-1_i386.deb no encontrado en el directorio actual."
+        exit 1
+    fi
+
+    echo "🔧 Corrigiendo posibles dependencias rotas..."
     sudo apt --fix-broken install -y
 else
-    echo "Sistema de 32 bits detectado. No es necesario configurar multiarch."
+    echo "ℹ️ Sistema de 32 bits detectado. No es necesario configurar multiarch."
 fi
-```
-
 ---
 
 ### 🛠️ Script 2: oracle-xe-install.sh
