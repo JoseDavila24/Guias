@@ -103,7 +103,6 @@ fi
 echo "🔹 Paso 1: Instalando paquetes .deb de Oracle XE..."
 
 sudo dpkg -i --force-architecture \
-    libaio_0.3.104-1_i386.deb \
     oracle-xe-client_10.2.0.1-1.2_i386.deb \
     oracle-xe-universal_10.2.0.1-1.1_i386.deb
 
