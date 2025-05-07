@@ -89,6 +89,8 @@ if [ "$ARCH" = "x86_64" ]; then
 else
     echo "ℹ️ Sistema de 32 bits detectado. No es necesario configurar multiarch."
 fi
+```
+
 ---
 
 ### 🛠️ Script 2: oracle-xe-install.sh
