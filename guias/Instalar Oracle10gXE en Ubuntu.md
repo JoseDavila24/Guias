@@ -73,26 +73,42 @@ Verifica que existan estos archivos `.sh`:
 
 ```bash
 #!/bin/bash
+
+# Salir inmediatamente si un comando falla.
+set -e
+
+# --- Verificación de Privilegios ---
+if [ "$(id -u)" -ne 0 ]; then
+  echo "❌ Este script debe ejecutarse con privilegios de superusuario (sudo)." >&2
+  echo "   Por favor, ejecútalo como: sudo ./preparar_entorno_oracle.sh"
+  exit 1
+fi
+
+# --- Detección de Arquitectura y Configuración Multiarch ---
 ARCH=$(uname -m)
 
 if [ "$ARCH" = "x86_64" ]; then
     echo "🔍 Sistema de 64 bits detectado. Habilitando soporte para i386..."
     sudo dpkg --add-architecture i386
-    sudo apt update
+    sudo apt update -y # Añadido -y para automatizar si es posible
 
-    echo "📦 Instalando dependencias necesarias desde archivo local..."
+    echo "📦 Instalando la dependencia libaio desde un archivo local..."
+    echo "   Asegúrate de que el archivo 'libaio_0.3.104-1_i386.deb' se encuentra en el mismo directorio que este script."
     if [ -f libaio_0.3.104-1_i386.deb ]; then
         sudo dpkg -i libaio_0.3.104-1_i386.deb
     else
-        echo "❌ Archivo libaio_0.3.104-1_i386.deb no encontrado en el directorio actual."
+        echo "❌ Archivo 'libaio_0.3.104-1_i386.deb' no encontrado en el directorio actual." >&2
+        echo "   Por favor, descarga el archivo y colócalo junto al script antes de continuar."
         exit 1
     fi
 
-    echo "🔧 Corrigiendo posibles dependencias rotas..."
+    echo "🔧 Corrigiendo posibles dependencias rotas después de instalar libaio..."
     sudo apt --fix-broken install -y
 else
-    echo "ℹ️ Sistema de 32 bits detectado. No es necesario configurar multiarch."
+    echo "ℹ️ Sistema de 32 bits detectado o arquitectura no x86_64 ($ARCH). No es necesario configurar multiarch para i386."
 fi
+
+echo "✅ Preparación del entorno completada."
 ```
 
 ---
@@ -101,104 +117,132 @@ fi
 
 ```bash
 #!/bin/bash
-ARCH=$(uname -m)
 
-if [ "$ARCH" = "x86_64" ]; then
-    echo "🔍 Sistema de 64 bits detectado. Habilitando soporte para i386..."
-    sudo dpkg --add-architecture i386
-    sudo apt update
+# Salir inmediatamente si un comando falla.
+set -e
 
-    echo "📦 Instalando dependencias necesarias desde archivo local..."
-    if [ -f libaio_0.3.104-1_i386.deb ]; then
-        sudo dpkg -i libaio_0.3.104-1_i386.deb
-    else
-        echo "❌ Archivo libaio_0.3.104-1_i386.deb no encontrado en el directorio actual."
-        exit 1
-    fi
-
-    echo "🔧 Corrigiendo posibles dependencias rotas..."
-    sudo apt --fix-broken install -y
-else
-    echo "ℹ️ Sistema de 32 bits detectado. No es necesario configurar multiarch."
+# --- Verificación de Privilegios ---
+if [ "$(id -u)" -ne 0 ]; then
+  echo "❌ Este script debe ejecutarse con privilegios de superusuario (sudo)." >&2
+  echo "   Por favor, ejecútalo como: sudo ./oracle-xe-install.sh"
+  exit 1
 fi
----
 
-### 🛠️ Script 2: oracle-xe-install.sh
+# --- Mensaje sobre Archivos Necesarios ---
+echo "ℹ️ Este script requiere los siguientes archivos .deb en el mismo directorio:"
+echo "   - libaio_0.3.104-1_i386.deb (si no se instaló con el script de preparación)"
+echo "   - oracle-xe-client_10.2.0.1-1.2_i386.deb"
+echo "   - oracle-xe-universal_10.2.0.1-1.1_i386.deb"
+echo "   Por favor, asegúrate de que estén presentes antes de continuar."
+# Podrías añadir una pausa aquí si lo deseas: read -p "Presiona [Enter] para continuar..."
 
-```bash
-#!/bin/bash
-
-# ------------------- PASO 1: Instalación de paquetes ---------------------
-
+# --- PASO 1: Instalación de paquetes .deb de Oracle XE ---
+echo ""
 echo "🔹 Paso 1: Instalando paquetes .deb de Oracle XE..."
 
-sudo dpkg -i --force-architecture \
-    libaio_0.3.104-1_i386.deb \
-    oracle-xe-client_10.2.0.1-1.2_i386.deb \
-    oracle-xe-universal_10.2.0.1-1.1_i386.deb
+# Lista de paquetes a instalar.
+# Nota: libaio_0.3.104-1_i386.deb podría ser redundante si el script de preparación ya lo instaló.
+# Se deja aquí por si este script se ejecuta de forma independiente. dpkg lo manejará.
+ORACLE_DEBS=(
+    "libaio_0.3.104-1_i386.deb"
+    "oracle-xe-client_10.2.0.1-1.2_i386.deb"
+    "oracle-xe-universal_10.2.0.1-1.1_i386.deb"
+)
 
-# Verifica si la instalación falló
+# Verificar existencia de todos los paquetes .deb necesarios
+for pkg_deb in "${ORACLE_DEBS[@]}"; do
+    if [ ! -f "$pkg_deb" ]; then
+        echo "❌ Archivo requerido '$pkg_deb' no encontrado en el directorio actual." >&2
+        exit 1
+    fi
+done
+
+# Instalar los paquetes
+# El uso de --force-architecture es a menudo necesario para estos paquetes antiguos.
+sudo dpkg -i --force-architecture "${ORACLE_DEBS[@]}"
+
+# Verifica si la instalación con dpkg falló
+# $? contiene el código de salida del último comando ejecutado.
 if [ $? -ne 0 ]; then
-    echo "⚠️ Error al instalar los paquetes .deb. Intentando reparar dependencias..."
+    echo "⚠️  Error durante la instalación de los paquetes .deb con dpkg."
+    echo "    Intentando reparar dependencias con 'apt --fix-broken install'..."
     sudo apt --fix-broken install -y
+    # Reintentar la instalación de dpkg podría ser una opción aquí,
+    # o simplemente confiar en que fix-broken resolvió las dependencias
+    # para que la configuración de Oracle funcione.
+    # Por ahora, se asume que fix-broken es suficiente si dpkg falló inicialmente.
 fi
 
 echo "✅ Paquetes .deb procesados."
 
-# ------------------- PASO 2: Corrección de dependencias ------------------
-
-echo "🔹 Paso 2: Corrigiendo dependencias restantes..."
-
+# --- PASO 2: Corrección de dependencias (puede ser redundante pero no perjudicial) ---
+echo ""
+echo "🔹 Paso 2: Corrigiendo dependencias restantes (si las hubiera)..."
 sudo apt --fix-broken install -y
-
 echo "✅ Dependencias corregidas."
 
-# ------------------- PASO 3: Instalación de rlwrap -----------------------
-
+# --- PASO 3: Instalación de rlwrap ---
+echo ""
 echo "🔹 Paso 3: Instalando rlwrap (mejora para SQL*Plus)..."
-
-sudo apt install -y rlwrap
-
-if [ $? -eq 0 ]; then
-    echo "✅ rlwrap instalado."
+if sudo apt install -y rlwrap; then
+    echo "✅ rlwrap instalado correctamente."
 else
-    echo "❌ No se pudo instalar rlwrap. Continúa bajo tu propio riesgo."
+    echo "⚠️  No se pudo instalar rlwrap. SQL*Plus funcionará, pero sin historial de comandos mejorado."
+    echo "    Puedes intentar instalarlo manualmente más tarde: sudo apt install rlwrap"
 fi
 
-# ------------------- PASO 4: Configurar Oracle XE ------------------------
-
+# --- PASO 4: Configurar Oracle XE ---
+echo ""
 echo "🔹 Paso 4: Configurando Oracle XE..."
-echo "⏳ Se abrirá un asistente en terminal. Introduce los datos solicitados (puerto, contraseña, etc.)"
-
+echo "⏳ Se abrirá el asistente de configuración de Oracle en la terminal."
+echo "   Por favor, introduce los datos solicitados (puerto HTTP, puerto del listener, contraseña para SYS y SYSTEM, etc.)."
+echo "   Recuerda bien la contraseña que establezcas."
 sudo /etc/init.d/oracle-xe configure
 
-# ------------------- PASO 5: Variables de entorno ------------------------
+# --- PASO 5: Variables de entorno ---
+echo ""
+echo "🔹 Paso 5: Añadiendo configuración de Oracle XE al archivo ~/.bashrc del usuario actual ($(whoami))..."
 
-echo "🔹 Paso 5: Añadiendo configuración al archivo ~/.bashrc..."
+# Define el bloque de configuración para evitar errores de sintaxis con EOF si hay comillas dentro.
+read -r -d '' ORACLE_CONFIG_BLOCK <<'EOF'
 
-# Evitar duplicados si se ejecuta más de una vez
-grep -q "ORACLE_HOME" ~/.bashrc || cat <<'EOF' >> ~/.bashrc
-
-# Configuración Oracle XE 10g
+# --- Configuración Oracle XE 10g ---
 export ORACLE_HOME=/usr/lib/oracle/xe/app/oracle/product/10.2.0/server
 export ORACLE_SID=XE
-export PATH=$PATH:$ORACLE_HOME/bin
-unset TWO_TASK
+export PATH=$ORACLE_HOME/bin:$PATH
+# Descomentar la siguiente línea si usas NLS_LANG y ajústala a tus necesidades
+# export NLS_LANG="SPANISH_SPAIN.WE8ISO8859P1" 
+unset TWO_TASK # Evita problemas con conexiones locales si está configurada.
 alias sqlplus='rlwrap sqlplus'
+# --- Fin Configuración Oracle XE 10g ---
 EOF
 
-# Aplicar los cambios
+# Evitar duplicados si el script se ejecuta más de una vez
+# Se busca una línea única del bloque, como ORACLE_HOME
+if grep -Fxq "export ORACLE_HOME=/usr/lib/oracle/xe/app/oracle/product/10.2.0/server" ~/.bashrc; then
+    echo "ℹ️  La configuración de ORACLE_HOME ya parece existir en ~/.bashrc. No se añadirá de nuevo."
+else
+    echo "$ORACLE_CONFIG_BLOCK" >> ~/.bashrc
+    echo "✅ Configuración de Oracle añadida a ~/.bashrc."
+fi
+
+# Aplicar los cambios a la sesión actual del script (no afecta otras terminales abiertas)
+# El usuario necesitará abrir una nueva terminal o sourcear ~/.bashrc manualmente.
 source ~/.bashrc
 
-echo "✅ Variables de entorno aplicadas."
+echo "✅ Variables de entorno aplicadas a la sesión actual del script."
+echo "   Para que los cambios surtan efecto en NUEVAS terminales, simplemente ábrelas."
+echo "   Para terminales YA ABIERTAS (diferentes a esta), ejecuta: source ~/.bashrc"
 
-# ------------------- PASO FINAL: Mensaje final ---------------------------
-
+# --- PASO FINAL: Mensaje final ---
 echo ""
-echo "🎉 Instalación y configuración de Oracle XE completadas."
-echo "ℹ️ Puedes iniciar sesión con:"
-echo "  sqlplus SYS/tu_contraseña AS SYSDBA"
-echo "  sqlplus SYSTEM/tu_contraseña"
+echo "🎉 ¡Instalación y configuración de Oracle XE 10g completadas!"
+echo "ℹ️  Para conectarte a la base de datos, abre una NUEVA TERMINAL (o ejecuta 'source ~/.bashrc' en una existente) y luego usa:"
+echo "    sqlplus SYS/tu_contraseña AS SYSDBA"
+echo "    sqlplus SYSTEM/tu_contraseña"
+echo ""
+echo "Recuerda reemplazar 'tu_contraseña' con la que estableciste durante la configuración."
+echo "Puedes verificar el estado del servicio con: sudo service oracle-xe status"
 ```
 
 ---
