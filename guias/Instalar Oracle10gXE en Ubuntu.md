@@ -101,15 +101,43 @@ fi
 
 ```bash
 #!/bin/bash
+ARCH=$(uname -m)
+
+if [ "$ARCH" = "x86_64" ]; then
+    echo "🔍 Sistema de 64 bits detectado. Habilitando soporte para i386..."
+    sudo dpkg --add-architecture i386
+    sudo apt update
+
+    echo "📦 Instalando dependencias necesarias desde archivo local..."
+    if [ -f libaio_0.3.104-1_i386.deb ]; then
+        sudo dpkg -i libaio_0.3.104-1_i386.deb
+    else
+        echo "❌ Archivo libaio_0.3.104-1_i386.deb no encontrado en el directorio actual."
+        exit 1
+    fi
+
+    echo "🔧 Corrigiendo posibles dependencias rotas..."
+    sudo apt --fix-broken install -y
+else
+    echo "ℹ️ Sistema de 32 bits detectado. No es necesario configurar multiarch."
+fi
+---
+
+### 🛠️ Script 2: oracle-xe-install.sh
+
+```bash
+#!/bin/bash
 
 # ------------------- PASO 1: Instalación de paquetes ---------------------
 
 echo "🔹 Paso 1: Instalando paquetes .deb de Oracle XE..."
 
 sudo dpkg -i --force-architecture \
+    libaio_0.3.104-1_i386.deb \
     oracle-xe-client_10.2.0.1-1.2_i386.deb \
     oracle-xe-universal_10.2.0.1-1.1_i386.deb
 
+# Verifica si la instalación falló
 if [ $? -ne 0 ]; then
     echo "⚠️ Error al instalar los paquetes .deb. Intentando reparar dependencias..."
     sudo apt --fix-broken install -y
@@ -120,47 +148,55 @@ echo "✅ Paquetes .deb procesados."
 # ------------------- PASO 2: Corrección de dependencias ------------------
 
 echo "🔹 Paso 2: Corrigiendo dependencias restantes..."
+
 sudo apt --fix-broken install -y
+
 echo "✅ Dependencias corregidas."
 
 # ------------------- PASO 3: Instalación de rlwrap -----------------------
 
-echo "🔹 Paso 3: Instalando rlwrap..."
+echo "🔹 Paso 3: Instalando rlwrap (mejora para SQL*Plus)..."
+
 sudo apt install -y rlwrap
+
+if [ $? -eq 0 ]; then
+    echo "✅ rlwrap instalado."
+else
+    echo "❌ No se pudo instalar rlwrap. Continúa bajo tu propio riesgo."
+fi
 
 # ------------------- PASO 4: Configurar Oracle XE ------------------------
 
 echo "🔹 Paso 4: Configurando Oracle XE..."
+echo "⏳ Se abrirá un asistente en terminal. Introduce los datos solicitados (puerto, contraseña, etc.)"
+
 sudo /etc/init.d/oracle-xe configure
 
-# ------------------- PASO 5: Añadir variables de entorno -----------------
+# ------------------- PASO 5: Variables de entorno ------------------------
 
-echo "🔹 Paso 5: Añadiendo configuración al archivo ~/.bashrc (sin aplicar automáticamente)..."
+echo "🔹 Paso 5: Añadiendo configuración al archivo ~/.bashrc..."
 
-CONFIG="
+# Evitar duplicados si se ejecuta más de una vez
+grep -q "ORACLE_HOME" ~/.bashrc || cat <<'EOF' >> ~/.bashrc
+
 # Configuración Oracle XE 10g
 export ORACLE_HOME=/usr/lib/oracle/xe/app/oracle/product/10.2.0/server
 export ORACLE_SID=XE
-export PATH=\\\$PATH:\\\$ORACLE_HOME/bin
+export PATH=$PATH:$ORACLE_HOME/bin
 unset TWO_TASK
 alias sqlplus='rlwrap sqlplus'
-"
+EOF
 
-# Añadir configuración si no existe aún
-if ! grep -q "ORACLE_HOME" ~/.bashrc; then
-    echo "$CONFIG" >> ~/.bashrc
-    echo "✅ Configuración añadida a ~/.bashrc"
-else
-    echo "ℹ️ Las variables de entorno ya estaban definidas."
-fi
+# Aplicar los cambios
+source ~/.bashrc
 
-echo ""
-echo "📌 NOTA: Cierra y vuelve a abrir la terminal o ejecuta 'source ~/.bashrc' manualmente para aplicar los cambios."
+echo "✅ Variables de entorno aplicadas."
 
-# ------------------- FINAL ---------------------------
+# ------------------- PASO FINAL: Mensaje final ---------------------------
 
 echo ""
-echo "🎉 Instalación completa. Puedes conectarte con:"
+echo "🎉 Instalación y configuración de Oracle XE completadas."
+echo "ℹ️ Puedes iniciar sesión con:"
 echo "  sqlplus SYS/tu_contraseña AS SYSDBA"
 echo "  sqlplus SYSTEM/tu_contraseña"
 ```
