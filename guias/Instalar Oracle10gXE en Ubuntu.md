@@ -63,6 +63,10 @@ Verifica que existan estos archivos `.deb`:
 * `oracle-xe-client_10.2.0.1-1.2_i386.deb`
 * `libaio_0.3.104-1_i386.deb`
 
+Verifica que existan estos archivos `.sh`:
+* `multiarch-setup.sh`
+* `oracle-xe-install.sh`
+
 ---
 
 ### 🛠️ Script 1: multiarch-setup.sh (solo para 64 bits)
