@@ -1,3 +1,4 @@
+
 # 🏗️ Guía Completa de Instalación y Configuración
 
 ## Oracle XE 10g en Ubuntu (x86\_64 / i386)
@@ -20,84 +21,49 @@ sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y && sudo ap
 
 ---
 
-## ✅ 1. Verificar la arquitectura del sistema
+## 1. Verificar Arquitectura del Sistema
 
+Debes saber si tu sistema es de 32 o 64 bits.
+
+**Comando para verificar la arquitectura:**  
 ```bash
 uname -m
 ```
+Resultados posibles:
 
-* `x86_64`: Sistema de 64 bits (requiere multiarch)
-* `i386` / `i686`: Sistema de 32 bits (no requiere cambios)
+-   `x86_64`: sistema de 64 bits → Requiere configuración adicional (multiarch)
+    
+-   `i386` / `i686`: sistema de 32 bits → Continúa directamente
+    
 
----
+----------
 
-## 📦 2. Descargar archivos necesarios
+## 2. Descargar Archivos Necesarios
 
-Descarga el archivo comprimido con los paquetes de Oracle XE:
+Descarga y descomprime el archivo `Oracle10gXE.zip`, lo cual generará una carpeta llamada `Oracle10gXE`.
 
-```bash
-wget -O Oracle10gXE.zip "https://www.dropbox.com/scl/fi/gbsuywuv02fud4ueves7o/Oracle10gXE.zip?rlkey=6z14f7dr1jgg43s0sdj5fgjxt&st=lmjilj61&dl=1"
-```
-
-Extrae su contenido:
-
-```bash
-unzip Oracle10gXE.zip
-```
-
-Esto creará una carpeta llamada `Oracle10gXE`.
-
-### 📂 Estructura final del directorio `Oracle10gXE/`
+**Estructura esperada del directorio:**
 
 ```
 Oracle10gXE/
-│
 ├── oracle-xe-universal_10.2.0.1-1.1_i386.deb
 ├── oracle-xe-client_10.2.0.1-1.2_i386.deb
 ├── libaio_0.3.104-1_i386.deb
-│
-├── multiarch-setup.sh           # Script para habilitar i386 en sistemas de 64 bits
-├── oracle-xe-install.sh         # Script para instalar los paquetes y lanzar la configuración
-└── post-configure-setup.sh      # Script para completar la instalación después del paso "configure"
+├── multiarch-setup.sh
+├── oracle-xe-install.sh
+├── post-configure-setup.sh
+
 ```
 
----
+----------
 
-## 📁 3. Instalación mediante scripts
+## 3. Instalación Paso a Paso
 
+### 🔹 Paso 1: Preparar el entorno (solo en sistemas de 64 bits)
 
-### 📌 Orden recomendado de ejecución
+Ejecuta el script:
 
-1. **Preparar entorno (solo si tu sistema es x86\_64)**:
-
-   ```bash
-   sudo ./multiarch-setup.sh
-   ```
-
-2. **Instalar Oracle XE**:
-
-   ```bash
-   sudo ./oracle-xe-install.sh
-   ```
-
-   ⏸️ *Este script se detiene en:*
-
-   ```bash
-   sudo /etc/init.d/oracle-xe configure
-   ```
-
-   *(Responde manualmente el asistente de configuración.)*
-
-3. **Después de terminar el paso interactivo**, ejecuta:
-
-   ```bash
-   sudo ./post-configure-setup.sh
-   ```
-
----
-
-### 🛠️ Script 1: multiarch-setup.sh (solo para 64 bits)
-
+📝 **multiarch-setup.sh**  
 ```bash
 #!/bin/bash
 
@@ -138,10 +104,13 @@ fi
 echo "✅ Preparación del entorno completada."
 ```
 
----
+----------
 
-### 🛠️ Script 2: oracle-xe-install.sh
+### 🔹 Paso 2: Instalar Oracle XE
 
+Ejecuta el script:
+
+📝 **oracle-xe-install.sh**  
 ```bash
 #!/bin/bash
 
@@ -226,7 +195,40 @@ echo "   Por favor, introduce los datos solicitados (puerto HTTP, puerto del lis
 echo "   Recuerda bien la contraseña que establezcas."
 sudo /etc/init.d/oracle-xe configure
 ```
-### 🛠️ Script 2: post-configure-setup.sh
+
+🔸 Este script se detendrá en la ejecución de:  
+`/etc/init.d/oracle-xe configure`  
+➡️ En este punto, deberás completar el asistente de instalación manualmente:
+
+-   Puerto HTTP
+    
+-   Puerto Listener
+    
+-   Contraseña para SYS y SYSTEM
+    
+
+----------
+
+## 4. Control del Servicio Oracle XE
+
+Antes de continuar con la configuración final, asegúrate de que el servicio está corriendo.
+
+Comandos útiles:
+
+-   ▶️ Iniciar: `/etc/init.d/oracle-xe start`
+    
+-   ⏹️ Detener: `/etc/init.d/oracle-xe stop`
+    
+-   🔎 Ver procesos: `ps -ef | grep oracle`
+    
+
+----------
+
+## 5. Finalizar la Configuración
+
+Una vez completado el paso interactivo, ejecuta el script final para configurar variables de entorno y dejar listo tu sistema:
+
+📝 **post-configure-setup.sh**
 
 ```bash
 #!/bin/bash
@@ -263,42 +265,23 @@ echo "🎯 PASO FINAL: Verifica conexión con Oracle usando sqlplus:"
 echo "    sqlplus SYS/tu_contraseña AS SYSDBA"
 echo "    sqlplus SYSTEM/tu_contraseña"
 ```
+----------
 
----
+## 6. Acceso a SQL*Plus
 
-## 🔁 4. Control del servicio Oracle XE
+-   🧑‍💼 SYS (administrador):  
+    `sqlplus SYS/tu_contraseña AS SYSDBA`
+    
+-   👤 SYSTEM (uso general):  
+    `sqlplus SYSTEM/tu_contraseña`
+    
+-   👥 Otro usuario:  
+    `sqlplus usuario/contraseña`
+    
 
-```bash
-sudo /etc/init.d/oracle-xe start     # Iniciar el servicio
-sudo /etc/init.d/oracle-xe stop      # Detenerlo
-ps -ef | grep oracle                  # Verificar procesos
-```
+----------
 
----
-
-## 🔐 5. Acceso a SQL\*Plus
-
-### SYS (administrador total):
-
-```bash
-sqlplus SYS/tu_contraseña AS SYSDBA
-```
-
-### SYSTEM (administración general):
-
-```bash
-sqlplus SYSTEM/tu_contraseña
-```
-
-### Otro usuario:
-
-```bash
-sqlplus usuario/contraseña
-```
-
----
-
-## 👤 6. Gestión básica de usuarios
+## 7. Gestión Básica de Usuarios
 
 ```sql
 -- Crear usuario:
@@ -318,13 +301,13 @@ SELECT table_name FROM user_tables;
 -- Eliminar usuario:
 DROP USER nuevo_usuario CASCADE;
 ```
+----------
 
----
+## 8. Personalización de SQL*Plus
 
-## ⚙️ 7. Personalización automática de SQL\*Plus (login.sql)
+Incluye un archivo `login.sql` en el mismo directorio desde donde ejecutas `sqlplus` para mejorar la visualización.
 
-Crea un archivo llamado `login.sql` con esta configuración:
-
+📝 **login.sql**  
 ```sql
 SET LINESIZE 200
 SET PAGESIZE 50
@@ -341,13 +324,10 @@ PROMPT *********************************************************
 PROMPT *       Bienvenido a SQL*Plus (Configuración cargada)   *
 PROMPT *********************************************************
 ```
+----------
 
-Coloca este archivo en el mismo directorio desde donde lanzas `sqlplus`.
+## 9. Recomendaciones Finales
 
----
-
-## 📌 Nota final
-
-* Oracle XE 10g funciona correctamente en sistemas modernos si se usa `multiarch`.
-* Recomendamos usar máquinas virtuales, contenedores Docker o LXD si deseas aislar el entorno.
-* Esta instalación es ideal para pruebas, enseñanza o desarrollo local.
+✔️ Ejecuta esta instalación dentro de una máquina virtual o contenedor si puedes.  
+✔️ Ideal para desarrollo, formación o pruebas.  
+✔️ No olvides ejecutar `source ~/.bashrc` o abrir una nueva terminal para aplicar los cambios.
