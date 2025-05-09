@@ -65,9 +65,6 @@ Oracle10gXE/
 
 ## 📁 3. Instalación mediante scripts
 
-Con la incorporación del nuevo script `post-configure-setup.sh`, tu estructura de archivos del instalador de Oracle XE 10g debería quedar así:
-
----
 
 ### 📌 Orden recomendado de ejecución
 
