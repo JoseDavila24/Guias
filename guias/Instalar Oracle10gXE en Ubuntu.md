@@ -336,9 +336,6 @@ PROMPT *********************************************************
 PROMPT *       Bienvenido a SQL*Plus (Configuración cargada)   *
 PROMPT *********************************************************
 ```
-----------
-Perfecto, aquí tienes el **Paso 9** redactado para integrarse a tu guía con el mismo estilo:
-
 ---
 
 ## 9. Habilitar el Usuario HR (Human Resources)
