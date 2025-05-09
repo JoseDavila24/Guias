@@ -40,7 +40,19 @@ Resultados posibles:
 
 ## 2. Descargar Archivos Necesarios
 
-Descarga y descomprime el archivo `Oracle10gXE.zip`, lo cual generará una carpeta llamada `Oracle10gXE`.
+Descarga el archivo comprimido con los paquetes de Oracle XE:
+
+```bash
+wget -O Oracle10gXE.zip "https://www.dropbox.com/scl/fi/gbsuywuv02fud4ueves7o/Oracle10gXE.zip?rlkey=6z14f7dr1jgg43s0sdj5fgjxt&st=lmjilj61&dl=1"
+```
+
+Extrae su contenido:
+
+```bash
+unzip Oracle10gXE.zip
+```
+
+Esto creará una carpeta llamada `Oracle10gXE`.
 
 **Estructura esperada del directorio:**
 
