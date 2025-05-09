@@ -337,8 +337,54 @@ PROMPT *       Bienvenido a SQL*Plus (Configuración cargada)   *
 PROMPT *********************************************************
 ```
 ----------
+Perfecto, aquí tienes el **Paso 9** redactado para integrarse a tu guía con el mismo estilo:
 
-## 9. Recomendaciones Finales
+---
+
+## 9. Habilitar el Usuario HR (Human Resources)
+
+Oracle 10g XE incluye por defecto el esquema **HR**, que contiene tablas de ejemplo muy útiles para aprendizaje y pruebas. Este usuario está deshabilitado por defecto, pero puedes activarlo fácilmente.
+
+### 🔹 Pasos para habilitar el usuario HR:
+
+1. **Conéctate como SYSDBA**
+   Abre una terminal y ejecuta:
+
+   ```
+   sqlplus SYS/tu_contraseña AS SYSDBA
+   ```
+
+2. **Desbloquea la cuenta HR**
+
+   ```sql
+   ALTER USER HR ACCOUNT UNLOCK;
+   ```
+
+3. **Establece una nueva contraseña para HR**
+
+   ```sql
+   ALTER USER HR IDENTIFIED BY nueva_contraseña;
+   ```
+
+   *(Reemplaza `nueva_contraseña` por la que prefieras)*
+
+4. **Verifica que esté desbloqueado (opcional)**
+
+   ```sql
+   SELECT username, account_status FROM dba_users WHERE username = 'HR';
+   ```
+
+   Si todo está correcto, verás: `HR | OPEN`
+
+5. **Conéctate como HR**
+
+   ```
+   sqlplus HR/nueva_contraseña
+   ```
+
+---
+
+## 10. Recomendaciones Finales
 
 ✔️ Ejecuta esta instalación dentro de una máquina virtual o contenedor si puedes.  
 ✔️ Ideal para desarrollo, formación o pruebas.  
