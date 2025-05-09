@@ -47,25 +47,55 @@ unzip Oracle10gXE.zip
 
 Esto creará una carpeta llamada `Oracle10gXE`.
 
+### 📂 Estructura final del directorio `Oracle10gXE/`
+
+```
+Oracle10gXE/
+│
+├── oracle-xe-universal_10.2.0.1-1.1_i386.deb
+├── oracle-xe-client_10.2.0.1-1.2_i386.deb
+├── libaio_0.3.104-1_i386.deb
+│
+├── multiarch-setup.sh           # Script para habilitar i386 en sistemas de 64 bits
+├── oracle-xe-install.sh         # Script para instalar los paquetes y lanzar la configuración
+└── post-configure-setup.sh      # Script para completar la instalación después del paso interactivo
+```
+
 ---
 
 ## 📁 3. Instalación mediante scripts
 
-### 🔸 Ingresar a la carpeta
+Con la incorporación del nuevo script `post-configure-setup.sh`, tu estructura de archivos del instalador de Oracle XE 10g debería quedar así:
 
-```bash
-cd Oracle10gXE/
-```
+---
 
-Verifica que existan estos archivos `.deb`:
+### 📌 Orden recomendado de ejecución
 
-* `oracle-xe-universal_10.2.0.1-1.1_i386.deb`
-* `oracle-xe-client_10.2.0.1-1.2_i386.deb`
-* `libaio_0.3.104-1_i386.deb`
+1. **Preparar entorno (solo si tu sistema es x86\_64)**:
 
-Verifica que existan estos archivos `.sh`:
-* `multiarch-setup.sh`
-* `oracle-xe-install.sh`
+   ```bash
+   sudo ./multiarch-setup.sh
+   ```
+
+2. **Instalar Oracle XE**:
+
+   ```bash
+   sudo ./oracle-xe-install.sh
+   ```
+
+   ⏸️ *Este script se detiene en:*
+
+   ```bash
+   sudo /etc/init.d/oracle-xe configure
+   ```
+
+   *(Responde manualmente el asistente de configuración.)*
+
+3. **Después de terminar el paso interactivo**, ejecuta:
+
+   ```bash
+   sudo ./post-configure-setup.sh
+   ```
 
 ---
 
@@ -198,65 +228,43 @@ echo "⏳ Se abrirá el asistente de configuración de Oracle en la terminal."
 echo "   Por favor, introduce los datos solicitados (puerto HTTP, puerto del listener, contraseña para SYS y SYSTEM, etc.)."
 echo "   Recuerda bien la contraseña que establezcas."
 sudo /etc/init.d/oracle-xe configure
+```
+### 🛠️ Script 2: post-configure-setup.sh
 
-# --- PASO 5: Variables de entorno ---
-echo ""
-echo "🔹 Paso 5: Añadiendo configuración de Oracle XE al archivo ~/.bashrc del usuario actual ($(whoami))..."
+```bash
+#!/bin/bash
 
-# Define el bloque de configuración para evitar errores de sintaxis con EOF si hay comillas dentro.
-read -r -d '' ORACLE_CONFIG_BLOCK <<'EOF'
+set -e
+
+# --- Verificación de privilegios ---
+if [ "$(id -u)" -ne 0 ]; then
+  echo "❌ Este script debe ejecutarse con sudo." >&2
+  echo "   Usa: sudo ./post-configure-setup.sh"
+  exit 1
+fi
+
+# --- Añadir variables de entorno si no existen ---
+ORACLE_BASHRC_LINE="export ORACLE_HOME=/usr/lib/oracle/xe/app/oracle/product/10.2.0/server"
+if ! grep -Fxq "$ORACLE_BASHRC_LINE" ~/.bashrc; then
+    echo "🛠️  Añadiendo configuración de Oracle XE al archivo ~/.bashrc..."
+    cat <<'EOF' >> ~/.bashrc
 
 # --- Configuración Oracle XE 10g ---
 export ORACLE_HOME=/usr/lib/oracle/xe/app/oracle/product/10.2.0/server
 export ORACLE_SID=XE
 export PATH=$ORACLE_HOME/bin:$PATH
-# Descomentar la siguiente línea si usas NLS_LANG y ajústala a tus necesidades
-# export NLS_LANG="SPANISH_SPAIN.WE8ISO8859P1" 
-unset TWO_TASK # Evita problemas con conexiones locales si está configurada.
 alias sqlplus='rlwrap sqlplus'
-# --- Fin Configuración Oracle XE 10g ---
 EOF
-
-# Evitar duplicados si el script se ejecuta más de una vez
-# Se busca una línea única del bloque, como ORACLE_HOME
-if grep -Fxq "export ORACLE_HOME=/usr/lib/oracle/xe/app/oracle/product/10.2.0/server" ~/.bashrc; then
-    echo "ℹ️  La configuración de ORACLE_HOME ya parece existir en ~/.bashrc. No se añadirá de nuevo."
+    echo "✅ Configuración añadida."
+    echo "⚠️  Ejecuta 'source ~/.bashrc' o abre una nueva terminal para aplicar los cambios."
 else
-    echo "$ORACLE_CONFIG_BLOCK" >> ~/.bashrc
-    echo "✅ Configuración de Oracle añadida a ~/.bashrc."
+    echo "ℹ️  Las variables de entorno ya están configuradas en ~/.bashrc."
 fi
 
-# Aplicar los cambios a la sesión actual del script (no afecta otras terminales abiertas)
-# El usuario necesitará abrir una nueva terminal o sourcear ~/.bashrc manualmente.
-source ~/.bashrc
-
-echo "✅ Variables de entorno aplicadas a la sesión actual del script."
-echo "   Para que los cambios surtan efecto en NUEVAS terminales, simplemente ábrelas."
-echo "   Para terminales YA ABIERTAS (diferentes a esta), ejecuta: source ~/.bashrc"
-
-# --- PASO FINAL: Mensaje final ---
 echo ""
-echo "🎉 ¡Instalación y configuración de Oracle XE 10g completadas!"
-echo "ℹ️  Para conectarte a la base de datos, abre una NUEVA TERMINAL (o ejecuta 'source ~/.bashrc' en una existente) y luego usa:"
+echo "🎯 PASO FINAL: Verifica conexión con Oracle usando sqlplus:"
 echo "    sqlplus SYS/tu_contraseña AS SYSDBA"
 echo "    sqlplus SYSTEM/tu_contraseña"
-echo ""
-echo "Recuerda reemplazar 'tu_contraseña' con la que estableciste durante la configuración."
-echo "Puedes verificar el estado del servicio con: sudo service oracle-xe status"
-```
-
----
-
-### ▶️ Ejecutar los scripts
-
-```bash
-chmod +x multiarch-setup.sh oracle-xe-install.sh
-
-# Si estás en 64 bits:
-./multiarch-setup.sh
-
-# Para instalar Oracle XE:
-./oracle-xe-install.sh
 ```
 
 ---
