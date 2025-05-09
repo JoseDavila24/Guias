@@ -36,7 +36,7 @@ uname -m
 Descarga el archivo comprimido con los paquetes de Oracle XE:
 
 ```bash
-wget -O Oracle10gXE.zip "https://www.dropbox.com/scl/fi/t7vrmey2dz5elm710rswe/Oracle10gXE.zip?rlkey=3lc8n96g1nnp3x5xxdm8rzatw&st=ch9nkhkt&dl=1"
+wget -O Oracle10gXE.zip "https://www.dropbox.com/scl/fi/gbsuywuv02fud4ueves7o/Oracle10gXE.zip?rlkey=6z14f7dr1jgg43s0sdj5fgjxt&st=lmjilj61&dl=1"
 ```
 
 Extrae su contenido:
