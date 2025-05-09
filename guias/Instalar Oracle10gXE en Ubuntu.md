@@ -58,7 +58,7 @@ Oracle10gXE/
 │
 ├── multiarch-setup.sh           # Script para habilitar i386 en sistemas de 64 bits
 ├── oracle-xe-install.sh         # Script para instalar los paquetes y lanzar la configuración
-└── post-configure-setup.sh      # Script para completar la instalación después del paso interactivo
+└── post-configure-setup.sh      # Script para completar la instalación después del paso "configure"
 ```
 
 ---
