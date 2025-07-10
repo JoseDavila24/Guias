@@ -1,4 +1,4 @@
-# ✅ **GUÍA FINAL: Registro de Instalaciones de Software en Lubuntu**
+# **Registro de Instalaciones de Software en Lubuntu**
 
 ## 🔹 **1. Crear carpeta base para el historial**
 
