@@ -61,17 +61,6 @@ df -h | grep hdd
 
 ---
 
-## 🗃️ RECUPERACIÓN Y ORGANIZACIÓN
-
-* Restauré mis archivos de backup desde `/mnt/hdd/Backups/home_full/` según necesidad.
-* Accedí a mis proyectos, máquinas virtuales, instaladores, scripts y recursos desde:
-
-```
-/mnt/hdd/Almacen/
-/mnt/hdd/Proyectos/
-```
-
----
 
 ## 🔒 CONSEJO DE SEGURIDAD
 
