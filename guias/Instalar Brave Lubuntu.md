@@ -1,22 +1,22 @@
+# 🦁 Guía Profesional para Instalar Brave Browser en Lubuntu
 
+## ✅ 1. Requisitos previos
 
-# 🦁 **Guía de Instalación de Brave Browser en Lubuntu**
+Antes de instalar Brave:
 
+1. Asegúrate de que tu sistema esté actualizado:
 
+   ```bash
+   sudo apt update && sudo apt upgrade -y
+   ```
 
-## ✅ **1. Preparativos previos**
-
-Antes de comenzar, asegúrate de que tu sistema esté actualizado:
-
-```bash
-sudo apt update && sudo apt upgrade -y
-```
+2. Verifica que tienes permisos de superusuario.
 
 ---
 
-## 🔧 **2. Instalación de Brave paso a paso**
+## 🔧 2. Instalación paso a paso
 
-### Paso 1: Instalar `curl` (si aún no está instalado)
+### 📦 Paso 1: Instalar `curl` (si no lo tienes)
 
 ```bash
 sudo apt install curl -y
@@ -24,7 +24,7 @@ sudo apt install curl -y
 
 ---
 
-### Paso 2: Añadir la clave GPG del repositorio de Brave
+### 🔑 Paso 2: Añadir la clave GPG de Brave
 
 ```bash
 sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg \
@@ -33,7 +33,7 @@ https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
 
 ---
 
-### Paso 3: Añadir el repositorio oficial de Brave
+### 📥 Paso 3: Añadir el repositorio oficial
 
 ```bash
 sudo curl -fsSLo /etc/apt/sources.list.d/brave-browser-release.sources \
@@ -42,7 +42,7 @@ https://brave-browser-apt-release.s3.brave.com/brave-browser.sources
 
 ---
 
-### Paso 4: Actualizar los paquetes
+### 🔄 Paso 4: Actualizar lista de paquetes
 
 ```bash
 sudo apt update
@@ -50,7 +50,7 @@ sudo apt update
 
 ---
 
-### Paso 5: Instalar Brave Browser
+### 🚀 Paso 5: Instalar Brave Browser
 
 ```bash
 sudo apt install brave-browser -y
@@ -58,9 +58,17 @@ sudo apt install brave-browser -y
 
 ---
 
-## 🚀 **3. Lanzar Brave por primera vez**
+### 🧪 Paso 6: Verificar instalación
 
-Una vez instalado, puedes abrir Brave desde el menú o escribiendo:
+```bash
+brave-browser --version
+```
+
+---
+
+## 🧭 3. Ejecutar Brave por primera vez
+
+Puedes iniciarlo desde el menú o con el comando:
 
 ```bash
 brave-browser
@@ -68,73 +76,158 @@ brave-browser
 
 ---
 
-## ⚠️ **4. Problemas conocidos: Brave se siente lento (teclado o interfaz)**
+## ⚠️ 4. Solución a problemas de rendimiento (teclado lento, congelamientos)
 
-Si notas que **el teclado responde lento** o la experiencia web (por ejemplo, en ChatGPT o sitios pesados) es **ralentizada**, sigue estas recomendaciones:
-
----
-
-### 🛠️ Recomendaciones de mejora de rendimiento:
-
-#### 🔹 A) Desactiva **aceleración por hardware** en Brave:
+### A) Desactivar aceleración por hardware
 
 1. Abre Brave.
-2. Ve a `Configuración` → `Sistema`.
-3. Desactiva la opción:
+2. Ir a `Configuración → Sistema`.
+3. Desactiva:
 
    * **“Usar aceleración por hardware cuando esté disponible”**
+Perfecto, José. Aquí tienes la sección **“⚠️ 4. Solución a problemas de rendimiento”** en versión **bilingüe (español e inglés)** para que coincida con la interfaz del navegador Brave (en inglés) y sea útil para usuarios técnicos que prefieren leer los menús en inglés:
+
+---
+
+## ⚠️ 4. Solución a problemas de rendimiento
+
+### (Teclado lento, congelamientos, interfaz lenta)
+
+### (Fixing keyboard lag, freezes, or slow UI responsiveness)
+
+---
+
+### 🔧 A) Desactivar la aceleración por hardware
+
+**(Disable hardware acceleration)**
+
+1. Abre Brave.
+   **(Open Brave)**
+2. Ve a `Configuración → Sistema`
+   **(Go to `Settings → System`)**
+3. Desactiva:
+   **(Turn off):**
+
+   * **“Usar aceleración por hardware cuando esté disponible”**
+     → `Use hardware acceleration when available`
 4. Reinicia Brave.
+   **(Restart Brave)**
 
-> Esto resuelve la mayoría de los casos de teclado lento o interfaz congelada.
-
----
-
-#### 🔹 B) Usa Brave con una ventana vacía al inicio (sin restaurar pestañas anteriores)
-
-En `Configuración` → `Al iniciar`, selecciona:
-
-* **“Abrir la página de nueva pestaña”**
-  en lugar de restaurar sesiones anteriores.
+🔁 Esto soluciona la mayoría de los casos de teclado congelado o lentitud gráfica.
+**(This resolves most keyboard lag and graphical freeze issues.)**
 
 ---
 
-#### 🔹 C) Revisa si hay problemas de GPU en Brave
+### 🧭 B) Iniciar con una pestaña vacía
 
-En la barra de direcciones escribe:
+**(Start with a new tab page instead of restoring previous session)**
 
-```
-brave://gpu
-```
+1. Ve a `Configuración → Al iniciar`
+   **(Go to `Settings → On startup`)**
+2. Selecciona:
 
-Busca líneas marcadas en rojo bajo "Graphics Feature Status". Si ves errores, lo ideal es dejar desactivada la aceleración por hardware.
+   * **“Abrir la página de nueva pestaña”**
+     → `Open the New Tab page`
+
+✅ Esto acelera el inicio del navegador.
+**(Helps speed up browser startup.)**
 
 ---
 
-#### 🔹 D) Usa la versión estable del kernel y drivers
+### 🔍 C) Verifica el estado de aceleración gráfica
 
-Un kernel demasiado nuevo o un driver inestable puede provocar lentitud en la aceleración de gráficos.
+**(Check graphics acceleration status in Brave)**
 
-Puedes comprobar tu versión actual con:
+1. En la barra de direcciones escribe:
+
+   ```
+   brave://gpu
+   ```
+2. Busca líneas en rojo en la sección
+   **"Graphics Feature Status"**.
+   Si hay errores, mantén la aceleración desactivada.
+   **(If there are red errors, it’s best to leave acceleration disabled.)**
+
+---
+
+### 🖥️ D) Verifica el kernel y los drivers gráficos
+
+**(Check your Linux kernel and video drivers)**
+
+Comprobar versión del kernel:
 
 ```bash
 uname -r
 ```
 
-Si tienes hardware Intel o AMD, asegúrate de tener instalados los controladores correctos:
+Ver tu driver gráfico activo:
 
 ```bash
-sudo apt install mesa-utils
+sudo apt install mesa-utils -y
 glxinfo | grep "OpenGL renderer"
 ```
 
+🔍 Si aparece `llvmpipe`, **no tienes aceleración por hardware real**.
+**(If `llvmpipe` shows up, you don’t have real GPU acceleration.)**
+
+Reinstala o configura los drivers correctos para tu GPU (Intel o AMD).
+**(Install proper GPU drivers for Intel or AMD if needed.)**
+
 ---
 
-### 📦 Opción adicional: Instalar Brave con `--disable-gpu`
+### 🚫 E) Ejecutar Brave sin aceleración de GPU
 
-Si el problema es persistente, puedes lanzar Brave con aceleración completamente desactivada:
+**(Launch Brave with GPU acceleration disabled)**
+
+Puedes iniciar Brave así desde terminal:
 
 ```bash
 brave-browser --disable-gpu
 ```
 
-Puedes crear un acceso directo personalizado si esto te soluciona el problema permanentemente.
+Esto fuerza al navegador a renderizar sin usar gráficos acelerados.
+**(This forces software rendering without GPU usage.)**
+
+🧠 Recomendado si otros pasos no funcionan.
+**(Recommended if the above steps don’t solve the issue.)**
+
+---
+
+## 🧠 Extra: Crear lanzador personalizado sin aceleración
+
+1. Crea un archivo `.desktop`:
+
+```bash
+nano ~/.local/share/applications/brave-browser-no-gpu.desktop
+```
+
+2. Pega lo siguiente:
+
+```ini
+[Desktop Entry]
+Name=Brave (Sin GPU)
+Comment=Brave con aceleración por hardware desactivada
+Exec=brave-browser --disable-gpu
+Icon=brave-browser
+Terminal=false
+Type=Application
+Categories=Network;WebBrowser;
+```
+
+3. Guarda, cierra y hazlo visible en el menú:
+
+```bash
+chmod +x ~/.local/share/applications/brave-browser-no-gpu.desktop
+```
+
+---
+
+## ✅ Resumen final
+
+| Tarea                                     | Estado      |
+| ----------------------------------------- | ----------- |
+| Sistema actualizado                       | ✅           |
+| Brave instalado desde repositorio oficial | ✅           |
+| Clave GPG y fuente segura añadidas        | ✅           |
+| Recomendaciones de rendimiento aplicadas  | 🧠 Opcional |
+| Acceso directo sin GPU disponible         | 🧠 Opcional |
