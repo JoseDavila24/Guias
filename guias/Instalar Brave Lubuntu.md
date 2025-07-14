@@ -76,18 +76,6 @@ brave-browser
 
 ---
 
-## ⚠️ 4. Solución a problemas de rendimiento (teclado lento, congelamientos)
-
-### A) Desactivar aceleración por hardware
-
-1. Abre Brave.
-2. Ir a `Configuración → Sistema`.
-3. Desactiva:
-
-   * **“Usar aceleración por hardware cuando esté disponible”**
-Perfecto, José. Aquí tienes la sección **“⚠️ 4. Solución a problemas de rendimiento”** en versión **bilingüe (español e inglés)** para que coincida con la interfaz del navegador Brave (en inglés) y sea útil para usuarios técnicos que prefieren leer los menús en inglés:
-
----
 
 ## ⚠️ 4. Solución a problemas de rendimiento
 
