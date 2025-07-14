@@ -189,7 +189,7 @@ sha256sum archivo
 
 ## ✅ Resultado final
 
-✔️ Tienes registro automático desde terminal
-✔️ Puedes escribir entradas manuales ordenadas
-✔️ Cada semana puedes detectar cualquier cambio en tu sistema
-✔️ Todo respaldado en tu HDD, centralizado, organizado y auditable
+* Tienes registro automático desde terminal
+* Puedes escribir entradas manuales ordenadas
+* Cada semana puedes detectar cualquier cambio en tu sistema
+* Todo respaldado en tu HDD, centralizado, organizado y auditable
