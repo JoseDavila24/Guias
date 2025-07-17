@@ -1,8 +1,6 @@
 
 # Guía Completa de Instalación y Configuración de Oracle XE 10g en Ubuntu (x86\_64 / i386)
 
----
-
 ## ⚠️ Importante: Actualización del Sistema
 
 **Descripción:**
