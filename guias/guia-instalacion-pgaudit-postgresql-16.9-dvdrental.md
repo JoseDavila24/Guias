@@ -125,7 +125,7 @@ Luego en terminal:
 ```bash
 cd /var/lib/postgresql/16/main/log
 ls -lh
-grep AUDIT postgresql-*.log
+tail -f postgresql-*.log | grep AUDIT
 ```
 
 Ejemplo de entrada esperada:
