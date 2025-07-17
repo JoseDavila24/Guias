@@ -136,6 +136,25 @@ AUDIT: SESSION,105,1,READ,SELECT,TABLE,public.customer,SELECT ...
 
 ---
 
+#### 🧾 8. Interpretación de logs `pgAudit`
+
+Ejemplo de línea de log:
+
+```
+2025-07-17 13:02:29.198 CST postgres dvdrental [34614]: LOG:  AUDIT: SESSION,3,1,READ,SELECT,TABLE,public.actor,select * from actor,<not logged>
+```
+
+Esto indica:
+
+* **El usuario** `postgres` consultó la tabla `public.actor`
+* **La operación fue** `SELECT` (lectura)
+* **Se auditó dentro de una sesión**
+* **No se registraron parámetros** porque `pgaudit.log_parameter = off`
+
+📌 A diferencia de `log_statement`, este formato permite saber con precisión **qué tabla fue accedida**, **qué clase de operación fue**, y es **fácil de filtrar** para auditorías automatizadas.
+
+---
+
 ## ✅ Clases comunes de auditoría
 
 | Clase      | Acciones auditadas                       |
