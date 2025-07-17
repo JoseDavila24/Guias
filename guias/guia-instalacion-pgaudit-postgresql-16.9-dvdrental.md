@@ -1,4 +1,4 @@
-## 📋 Guía Completa: Auditoría con `pgAudit` en PostgreSQL 16.9 usando la base `dvdrental`
+## Auditoría con `pgAudit` en PostgreSQL 16.9 usando la base `dvdrental`
 
 ### 🔍 1. Revisión previa
 
