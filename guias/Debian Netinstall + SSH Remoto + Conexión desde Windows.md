@@ -1,4 +1,4 @@
-# 🧰 GUÍA COMPLETA: Debian Netinstall + SSH Remoto + Conexión desde Windows
+# Debian Netinstall + SSH Remoto + Conexión desde Windows
 
 ## 🔧 1. Instalar Debian Netinstall (Minimal, sin GUI)
 
