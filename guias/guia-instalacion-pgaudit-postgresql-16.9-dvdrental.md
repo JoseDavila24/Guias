@@ -1,38 +1,32 @@
-## 📋 Guía completa: Instalación y configuración de `pgAudit` en PostgreSQL 16.9 con `dvdrental`
+## 📋 Guía Completa: Auditoría con `pgAudit` en PostgreSQL 16.9 usando la base `dvdrental`
 
-### 1. Clonar el repositorio oficial y checkout
+### 🔍 1. Revisión previa
 
-```bash
-git clone https://github.com/pgaudit/pgaudit.git
-cd pgaudit
-git checkout REL_16_STABLE
-```
+Antes de comenzar, revisa el repositorio oficial de `pgAudit`:
 
----
+📎 [https://github.com/pgaudit/pgaudit](https://github.com/pgaudit/pgaudit)
 
-### 2. Compilar e instalar
-
-⚠️ **Importante:** Ajusta el comando final:
-
-```bash
-sudo make install USE_PGXS=1 PG_CONFIG=/usr/bin/pg_config
-```
-
-No uses rutas de versiones diferentes ya que no coincide con tu PostgreSQL 16.9 instalado desde paquetes del sistema.
+🔧 Asegúrate de que estás usando la **rama compatible** con tu versión de PostgreSQL. Para PostgreSQL 16, debe ser `REL_16_STABLE`.
 
 ---
 
-### 3. Configuración del servidor PostgreSQL
+### 🛠️ 2. Configuración en `postgresql.conf`
 
-Edita `postgresql.conf`:
+Edita el archivo, por ejemplo:
+
+```bash
+sudo nano /etc/postgresql/16/main/postgresql.conf
+```
+
+Agrega o modifica:
 
 ```conf
 shared_preload_libraries = 'pgaudit'
-log_line_prefix = '%m %u %d [%p]: '
-log_destination = 'stderr'
 logging_collector = on
-log_directory = 'log'
+log_destination = 'stderr'
+log_directory = 'log'            # relativo al data_directory
 log_filename = 'postgresql-%a.log'
+log_line_prefix = '%m %u %d [%p]: '
 log_statement = 'none'
 ```
 
@@ -44,9 +38,15 @@ sudo systemctl restart postgresql
 
 ---
 
-### 4. Habilitar `pgAudit` en la base `dvdrental`
+### 🧩 3. Activar `pgAudit` en la base `dvdrental`
 
-Conéctate a `dvdrental`:
+Conéctate:
+
+```bash
+psql -U postgres -d dvdrental
+```
+
+Ejecuta:
 
 ```sql
 CREATE EXTENSION pgaudit;
@@ -54,7 +54,7 @@ CREATE EXTENSION pgaudit;
 
 ---
 
-### 5. Configurar auditoría a nivel global
+### ⚙️ 4. Configurar auditoría
 
 ```sql
 ALTER SYSTEM SET pgaudit.log = 'read, write, ddl';
@@ -62,59 +62,44 @@ ALTER SYSTEM SET pgaudit.log_relation = on;
 SELECT pg_reload_conf();
 ```
 
-Esto activa auditoría para:
+---
 
-* **Lectura** (`SELECT`)
-* **Escritura** (`INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`)
-* **DDL** (`CREATE`, `DROP`, `ALTER`)
-* Desglosa por relación (`log_relation = on`).
+### 🧪 5. Ejemplos explicados con `dvdrental`
+
+#### 📌 a) Consulta de lectura
+
+```sql
+SELECT first_name FROM customer WHERE customer_id = 1;
+```
+
+➡️ Se genera un log `READ` para `customer`.
 
 ---
 
-### 6. Ejemplos de auditoría con `dvdrental`
-
-Conéctate y ejecuta lo siguiente:
-
-#### a) Auditoría de DML y SELECT:
+#### 📌 b) Operaciones de escritura
 
 ```sql
-SELECT first_name, last_name FROM customer WHERE customer_id = 1;
-UPDATE customer SET first_name = 'Pedro' WHERE customer_id = 2;
-INSERT INTO rental (rental_date, inventory_id, customer_id, return_date, staff_id)
-  VALUES (now(), 1, 2, now()+interval '1 day', 1);
+UPDATE customer SET first_name = 'Ana' WHERE customer_id = 2;
 DELETE FROM payment WHERE payment_id = 10;
 ```
 
-**Resultado esperado en logs**:
-
-```
-AUDIT: SESSION,...,READ,SELECT,TABLE,public.customer,...
-AUDIT: SESSION,...,WRITE,UPDATE,TABLE,public.customer,...
-AUDIT: SESSION,...,WRITE,INSERT,TABLE,public.rental,...
-AUDIT: SESSION,...,WRITE,DELETE,TABLE,public.payment,...
-```
+➡️ Se generan logs `WRITE`, uno por tabla afectada.
 
 ---
 
-#### b) Auditoría de DDL
+#### 📌 c) Cambios de esquema (DDL)
 
 ```sql
-CREATE TABLE auditoria_prueba (id serial PRIMARY KEY, descripcion text);
-ALTER TABLE auditoria_prueba ADD COLUMN creado timestamp;
-DROP TABLE auditoria_prueba;
+CREATE TABLE auditoria_test (id serial PRIMARY KEY);
+ALTER TABLE auditoria_test ADD COLUMN activo boolean;
+DROP TABLE auditoria_test;
 ```
 
-**En los logs verás**:
-
-```
-AUDIT: SESSION,...,DDL,CREATE TABLE,...
-AUDIT: SESSION,...,DDL,ALTER TABLE,...
-AUDIT: SESSION,...,DDL,DROP TABLE,...
-```
+➡️ Logs `DDL` indicando los cambios de estructura.
 
 ---
 
-#### c) Prueba con bloques `DO`
+#### 📌 d) Bloques anónimos `DO`
 
 ```sql
 DO $$
@@ -123,76 +108,41 @@ BEGIN
 END $$;
 ```
 
-**pgAudit registrará de forma clara**:
-
-```
-AUDIT: SESSION,...,FUNCTION,DO,,,"DO $$ ... $$;"
-AUDIT: SESSION,...,DDL,CREATE TABLE,TABLE,public.temp_dynamic,...
-```
-
-Gracias a la diferencia entre `FUNCTION` y `DDL`, podrás distinguir entre ejecución dinámica y cambios reales.
+➡️ Se genera un log `FUNCTION` y uno `DDL` para la tabla creada dinámicamente.
 
 ---
 
-#### d) Auditoría con parámetros
+### 🔍 6. Verificación de logs
 
-Habilita parámetros y prueba con `PREPARE`+`EXECUTE`:
+Verifica la ubicación del directorio de datos:
 
 ```sql
-ALTER SYSTEM SET pgaudit.log_parameter = on;
-SELECT pg_reload_conf();
-
-PREPARE stmt (int) AS SELECT * FROM customer WHERE customer_id = $1;
-EXECUTE stmt (1);
+SHOW data_directory;
 ```
 
-**En los logs verás**:
+Luego en terminal:
+
+```bash
+cd /var/lib/postgresql/16/main/log
+ls -lh
+grep AUDIT postgresql-*.log
+```
+
+Ejemplo de entrada esperada:
 
 ```
-AUDIT: SESSION,...,READ,PREPARE,,,"PREPARE stmt ...",<none>
-AUDIT: SESSION,...,READ,SELECT,TABLE,public.customer,"... WHERE customer_id = $1",1
+AUDIT: SESSION,105,1,READ,SELECT,TABLE,public.customer,SELECT ...
 ```
-
-El valor `1` está registrado gracias a `log_parameter` ([PostgreSQL][1], [postgrespro.com][2], [PostgreSQL][3]).
 
 ---
 
-## 🧾 7. Verificación en logs
+## ✅ Clases comunes de auditoría
 
-Accede a `/var/log/postgresql/postgresql-*.log` y busca entradas que comiencen con `AUDIT:`. Deberías encontrar combinaciones de:
-
-* `SESSION,READ,WRITE,DDL`
-* `FUNCTION` (bloques DO)
-* Parámetros si están habilitados.
-
----
-
-### 8. Recomendaciones avanzadas
-
-* Establece `pgaudit.log_catalog = off` para evitar ruido de consultas internas ([PostgreSQL][3], [sources.debian.org][4]).
-* Usa `object audit logging` para auditar solo ciertas tablas:
-
-  ```sql
-  CREATE ROLE auditor NOLOGIN;
-  ALTER SYSTEM SET pgaudit.role = 'auditor';
-  SELECT pg_reload_conf();
-  GRANT SELECT, INSERT ON public.customer TO auditor;
-  ```
-
-  Ahora solo lo que afecte a `customer` será auditado detalladamente.
-* Añade `log_rows = on` si requieres número de filas afectadas.
-* Ajusta `log_parameter_max_size` para limitar el tamaño de los parámetros.
+| Clase      | Acciones auditadas                       |
+| ---------- | ---------------------------------------- |
+| `READ`     | `SELECT`, `COPY FROM`                    |
+| `WRITE`    | `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` |
+| `DDL`      | Cambios de esquema                       |
+| `FUNCTION` | Bloques `DO` o funciones                 |
 
 ---
-
-### ✅ Resumen
-
-| Paso | Acción                                         |
-| ---- | ---------------------------------------------- |
-| 1    | Clonar y checkout de `REL_16_STABLE`           |
-| 2    | `make install` con `pg_config` de `/usr/bin`   |
-| 3    | Configurar `postgresql.conf` y reiniciar       |
-| 4    | Crear extensión en `dvdrental`                 |
-| 5    | Ajustar `pgaudit.log` y recargar configuración |
-| 6    | Ejecutar consultas de prueba                   |
-| 7    | Revisar logs de auditoría                      |
