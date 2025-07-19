@@ -1,36 +1,62 @@
-## Auditoría con `pgAudit` en PostgreSQL 16.9 usando la base `dvdrental`
-
-### 🔍 1. Revisión previa
-
-Antes de comenzar, revisa el repositorio oficial de `pgAudit`:
-
-📎 [https://github.com/pgaudit/pgaudit](https://github.com/pgaudit/pgaudit)
-
-🔧 Asegúrate de que estás usando la **rama compatible** con tu versión de PostgreSQL. Para PostgreSQL 16, debe ser `REL_16_STABLE`.
+# 🛡️ Guía Completa de Auditoría en PostgreSQL 16.9 con `pgAudit` (Ubuntu 24.04)
 
 ---
 
-### 🛠️ 2. Configuración en `postgresql.conf`
+## 🔍 1. ¿Qué es pgAudit y por qué usarlo?
 
-Edita el archivo, por ejemplo:
+`pgAudit` (PostgreSQL Audit Extension) permite generar registros detallados de las acciones realizadas sobre una base de datos, esenciales para cumplir con normativas como ISO, financieras o gubernamentales.
+
+A diferencia de `log_statement`, `pgAudit` ofrece logs estructurados con información sobre qué tabla fue accedida, qué tipo de operación se realizó, y más.
+
+📎 Repositorio oficial: [https://github.com/pgaudit/pgaudit](https://github.com/pgaudit/pgaudit)
+✔️ Para PostgreSQL 16, usa la rama `REL_16_STABLE`.
+
+---
+
+## 🧰 2. Instalación de `pgAudit` desde código fuente
+
+### 2.1 Instala las dependencias necesarias
+
+```bash
+apt update
+apt install -y make build-essential git libkrb5-dev postgresql-server-dev-16
+```
+
+### 2.2 Clona y compila la extensión `pgAudit`
+
+```bash
+git clone https://github.com/pgaudit/pgaudit.git
+cd pgaudit
+git checkout REL_16_STABLE
+make install USE_PGXS=1 PG_CONFIG=/usr/bin/pg_config
+```
+
+---
+
+## ⚙️ 3. Configuración inicial en `postgresql.conf`
+
+Edita el archivo de configuración principal de PostgreSQL:
 
 ```bash
 sudo nano /etc/postgresql/16/main/postgresql.conf
 ```
 
-Agrega o modifica:
+Asegúrate de incluir o modificar estas líneas:
 
 ```conf
+# Configuración básica de auditoría
 shared_preload_libraries = 'pgaudit'
+
+# Configuración de logs
 logging_collector = on
 log_destination = 'stderr'
-log_directory = 'log'            # relativo al data_directory
+log_directory = 'log'            # relativo a data_directory
 log_filename = 'postgresql-%a.log'
 log_line_prefix = '%m %u %d [%p]: '
 log_statement = 'none'
 ```
 
-Luego reinicia:
+Reinicia el servicio:
 
 ```bash
 sudo systemctl restart postgresql
@@ -38,15 +64,15 @@ sudo systemctl restart postgresql
 
 ---
 
-### 🧩 3. Activar `pgAudit` en la base `dvdrental`
+## 🔌 4. Activar `pgAudit` en tu base de datos
 
-Conéctate:
+Conéctate a la base `dvdrental`:
 
 ```bash
-psql -U postgres -d dvdrental
+sudo -u postgres psql -d dvdrental
 ```
 
-Ejecuta:
+Y ejecuta:
 
 ```sql
 CREATE EXTENSION pgaudit;
@@ -54,73 +80,89 @@ CREATE EXTENSION pgaudit;
 
 ---
 
-### ⚙️ 4. Configurar auditoría
+## 🛠️ 5. Configurar auditoría con `pgAudit`
+
+### ✅ Opción A — Configuración permanente desde archivo
+
+Edita nuevamente el archivo `postgresql.conf`:
+
+```bash
+sudo nano /etc/postgresql/16/main/postgresql.conf
+```
+
+Agrega estas líneas:
+
+```conf
+pgaudit.log = 'read, write, ddl, function'
+pgaudit.log_relation = on
+pgaudit.log_parameter = on
+```
+
+Reinicia PostgreSQL:
+
+```bash
+sudo systemctl restart postgresql
+```
+
+### 🧪 Opción B — Configuración dinámica desde `psql` (para pruebas)
 
 ```sql
-ALTER SYSTEM SET pgaudit.log = 'read, write, ddl';
+ALTER SYSTEM SET pgaudit.log = 'read, write, ddl, function';
 ALTER SYSTEM SET pgaudit.log_relation = on;
+ALTER SYSTEM SET pgaudit.log_parameter = on;
 SELECT pg_reload_conf();
 ```
 
 ---
 
-### 🧪 5. Ejemplos explicados con `dvdrental`
+## 🧪 6. Pruebas de auditoría con la base `dvdrental`
 
-#### 📌 a) Consulta de lectura
+### a) Consulta `SELECT`
 
 ```sql
-SELECT first_name FROM customer WHERE customer_id = 1;
+SELECT * FROM customer WHERE customer_id = 1;
 ```
 
-➡️ Se genera un log `READ` para `customer`.
+➡️ Genera log `READ` para la tabla `customer`.
+
+### b) Operaciones `UPDATE` y `DELETE`
+
+```sql
+UPDATE customer SET last_name = 'Ramos' WHERE customer_id = 2;
+DELETE FROM rental WHERE rental_id = 1000;
+```
+
+➡️ Logs `WRITE` por cada tabla afectada.
+
+### c) Cambios al esquema (`DDL`)
+
+```sql
+CREATE TABLE test_audit (id serial PRIMARY KEY);
+ALTER TABLE test_audit ADD COLUMN activo boolean;
+DROP TABLE test_audit;
+```
+
+➡️ Se generan logs `DDL`.
+
+### d) Bloque anónimo (`DO`)
+
+```sql
+DO $$ BEGIN EXECUTE 'CREATE TABLE temp_test (x int)'; END $$;
+```
+
+➡️ Se genera un log `FUNCTION` y otro `DDL`.
 
 ---
 
-#### 📌 b) Operaciones de escritura
+## 🗂️ 7. Revisión y filtrado de logs generados
 
-```sql
-UPDATE customer SET first_name = 'Ana' WHERE customer_id = 2;
-DELETE FROM payment WHERE payment_id = 10;
-```
-
-➡️ Se generan logs `WRITE`, uno por tabla afectada.
-
----
-
-#### 📌 c) Cambios de esquema (DDL)
-
-```sql
-CREATE TABLE auditoria_test (id serial PRIMARY KEY);
-ALTER TABLE auditoria_test ADD COLUMN activo boolean;
-DROP TABLE auditoria_test;
-```
-
-➡️ Logs `DDL` indicando los cambios de estructura.
-
----
-
-#### 📌 d) Bloques anónimos `DO`
-
-```sql
-DO $$
-BEGIN
-  EXECUTE 'CREATE TABLE temp_dynamic (x int)';
-END $$;
-```
-
-➡️ Se genera un log `FUNCTION` y uno `DDL` para la tabla creada dinámicamente.
-
----
-
-### 🔍 6. Verificación de logs
-
-Verifica la ubicación del directorio de datos:
+### a) Ubica tu directorio de datos:
 
 ```sql
 SHOW data_directory;
 ```
 
-Luego en terminal:
+### b) Revisa los archivos de log:
 
 ```bash
 cd /var/lib/postgresql/16/main/log
@@ -128,40 +170,47 @@ ls -lh
 tail -f postgresql-*.log | grep AUDIT
 ```
 
-Ejemplo de entrada esperada:
-
-```
-AUDIT: SESSION,105,1,READ,SELECT,TABLE,public.customer,SELECT ...
-```
-
----
-
-#### 🧾 8. Interpretación de logs `pgAudit`
-
-Ejemplo de línea de log:
+Ejemplo de salida:
 
 ```
 2025-07-17 13:02:29.198 CST postgres dvdrental [34614]: LOG:  AUDIT: SESSION,3,1,READ,SELECT,TABLE,public.actor,select * from actor,<not logged>
 ```
 
-Esto indica:
+---
 
-* **El usuario** `postgres` consultó la tabla `public.actor`
-* **La operación fue** `SELECT` (lectura)
-* **Se auditó dentro de una sesión**
-* **No se registraron parámetros** porque `pgaudit.log_parameter = off`
+## 🧾 8. Interpretación de logs `pgAudit`
 
-📌 A diferencia de `log_statement`, este formato permite saber con precisión **qué tabla fue accedida**, **qué clase de operación fue**, y es **fácil de filtrar** para auditorías automatizadas.
+Cada línea de log contiene:
+
+* Tipo: `SESSION` u `OBJECT`
+* Clase: `READ`, `WRITE`, `DDL`, etc.
+* Objeto: `TABLE`, `VIEW`, etc.
+* Nombre del objeto: Ej. `public.customer`
+* Comando ejecutado
+* Parámetros (si `log_parameter` está activado)
+
+Ejemplo:
+
+```
+AUDIT: SESSION,3,1,READ,SELECT,TABLE,public.customer,SELECT * FROM customer,<not logged>
+```
 
 ---
 
-## ✅ Clases comunes de auditoría
+## ✅ 9. Clases más comunes de auditoría en `pgAudit`
 
-| Clase      | Acciones auditadas                       |
-| ---------- | ---------------------------------------- |
-| `READ`     | `SELECT`, `COPY FROM`                    |
-| `WRITE`    | `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` |
-| `DDL`      | Cambios de esquema                       |
-| `FUNCTION` | Bloques `DO` o funciones                 |
+| Clase      | Acciones auditadas                           |
+| ---------- | -------------------------------------------- |
+| `READ`     | `SELECT`, `COPY FROM`                        |
+| `WRITE`    | `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`     |
+| `DDL`      | Cambios de esquema (`CREATE`, `ALTER`, etc.) |
+| `FUNCTION` | Bloques `DO` y funciones PL/pgSQL            |
 
 ---
+
+## 🎯 10. Ventajas clave frente a `log_statement`
+
+* 🎯 Estructura de log clara y parseable
+* 🎯 Incluye tipo de operación, tabla y detalles
+* 🎯 Fácil integración con sistemas de auditoría
+* 🎯 Reduce ruido de operaciones irrelevantes (`pg_catalog`)
