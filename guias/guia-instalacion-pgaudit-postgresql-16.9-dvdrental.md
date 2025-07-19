@@ -1,7 +1,5 @@
 # 🛡️ Guía Completa de Auditoría en PostgreSQL 16.9 con `pgAudit` (Ubuntu 24.04)
 
----
-
 ## 🔍 1. ¿Qué es pgAudit y por qué usarlo?
 
 `pgAudit` (PostgreSQL Audit Extension) permite generar registros detallados de las acciones realizadas sobre una base de datos, esenciales para cumplir con normativas como ISO, financieras o gubernamentales.
