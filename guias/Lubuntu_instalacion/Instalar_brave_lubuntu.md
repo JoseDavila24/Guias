@@ -1,74 +1,28 @@
-# 🦁 Guía Profesional para Instalar Brave Browser en Lubuntu
+# 🦁 Instalar Brave Browser en Lubuntu (Guía Oficial y Optimizada)
 
-## ✅ 1. Requisitos previos
+## ✅ 1. Instalación de Brave desde el repositorio oficial
 
-Antes de instalar Brave:
-
-1. Asegúrate de que tu sistema esté actualizado:
-
-   ```bash
-   sudo apt update && sudo apt upgrade -y
-   ```
-
-2. Verifica que tienes permisos de superusuario.
-
----
-
-## 🔧 2. Instalación paso a paso
-
-### 📦 Paso 1: Instalar `curl` (si no lo tienes)
+Ejecuta cada uno de estos comandos en terminal:
 
 ```bash
-sudo apt install curl -y
-```
+sudo apt install curl
 
----
-
-### 🔑 Paso 2: Añadir la clave GPG de Brave
-
-```bash
 sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg \
 https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
-```
 
----
-
-### 📥 Paso 3: Añadir el repositorio oficial
-
-```bash
 sudo curl -fsSLo /etc/apt/sources.list.d/brave-browser-release.sources \
 https://brave-browser-apt-release.s3.brave.com/brave-browser.sources
-```
 
----
-
-### 🔄 Paso 4: Actualizar lista de paquetes
-
-```bash
 sudo apt update
-```
 
----
-
-### 🚀 Paso 5: Instalar Brave Browser
-
-```bash
 sudo apt install brave-browser -y
 ```
 
 ---
 
-### 🧪 Paso 6: Verificar instalación
+## 🚀 2. Ejecutar Brave
 
-```bash
-brave-browser --version
-```
-
----
-
-## 🧭 3. Ejecutar Brave por primera vez
-
-Puedes iniciarlo desde el menú o con el comando:
+Desde el menú de aplicaciones o con:
 
 ```bash
 brave-browser
@@ -76,146 +30,118 @@ brave-browser
 
 ---
 
+## ⚙️ 3. Recomendación rápida de rendimiento
 
-## ⚠️ 4. Solución a problemas de rendimiento
-
-### (Teclado lento, congelamientos, interfaz lenta)
-
-### (Fixing keyboard lag, freezes, or slow UI responsiveness)
-
----
-
-### 🔧 A) Desactivar la aceleración por hardware
-
-**(Disable hardware acceleration)**
+Si Brave se siente lento o congelado:
 
 1. Abre Brave.
-   **(Open Brave)**
-2. Ve a `Configuración → Sistema`
-   **(Go to `Settings → System`)**
-3. Desactiva:
-   **(Turn off):**
-
-   * **“Usar aceleración por hardware cuando esté disponible”**
-     → `Use hardware acceleration when available`
-4. Reinicia Brave.
-   **(Restart Brave)**
-
-🔁 Esto soluciona la mayoría de los casos de teclado congelado o lentitud gráfica.
-**(This resolves most keyboard lag and graphical freeze issues.)**
+2. Ve a `Configuración → Sistema`.
+3. Desactiva: **“Usar aceleración por hardware cuando esté disponible”**.
+4. Reinicia el navegador.
 
 ---
 
-### 🧭 B) Iniciar con una pestaña vacía
+## 🧠 4. Verifica si tu equipo está listo para navegar bien con Brave
 
-**(Start with a new tab page instead of restoring previous session)**
+Puedes usar un script automático que evalúa:
 
-1. Ve a `Configuración → Al iniciar`
-   **(Go to `Settings → On startup`)**
-2. Selecciona:
-
-   * **“Abrir la página de nueva pestaña”**
-     → `Open the New Tab page`
-
-✅ Esto acelera el inicio del navegador.
-**(Helps speed up browser startup.)**
+* Cantidad de RAM
+* Tipo de disco (SSD o HDD)
+* Presencia de aceleración gráfica
+* Estado de la conexión a internet
 
 ---
 
-### 🔍 C) Verifica el estado de aceleración gráfica
+### 📁 Ruta recomendada para guardar el script
 
-**(Check graphics acceleration status in Brave)**
-
-1. En la barra de direcciones escribe:
-
-   ```
-   brave://gpu
-   ```
-2. Busca líneas en rojo en la sección
-   **"Graphics Feature Status"**.
-   Si hay errores, mantén la aceleración desactivada.
-   **(If there are red errors, it’s best to leave acceleration disabled.)**
-
----
-
-### 🖥️ D) Verifica el kernel y los drivers gráficos
-
-**(Check your Linux kernel and video drivers)**
-
-Comprobar versión del kernel:
+Guárdalo en:
 
 ```bash
-uname -r
+/mnt/hdd/Almacenamiento/Scripts/verificar_equipo_brave.sh
 ```
 
-Ver tu driver gráfico activo:
+---
+
+### 📜 Contenido del script `verificar_equipo_brave.sh`
 
 ```bash
-sudo apt install mesa-utils -y
+#!/bin/bash
+
+echo "🔍 Verificando condiciones del sistema para una buena experiencia con Brave..."
+
+# 1. Verificar RAM
+total_ram=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+ram_gb=$((total_ram / 1024 / 1024))
+echo "📦 RAM instalada: $ram_gb GB"
+if [ "$ram_gb" -lt 4 ]; then
+  echo "⚠️ Recomendación: Considera ampliar la RAM a al menos 4 GB."
+else
+  echo "✅ RAM suficiente."
+fi
+
+# 2. Verificar si se usa un SSD
+root_disk=$(df / | tail -1 | awk '{print $1}')
+disk_name=$(basename "$(lsblk -no PKNAME "$root_disk")")
+rotational=$(cat /sys/block/$disk_name/queue/rotational 2>/dev/null)
+if [ "$rotational" = "0" ]; then
+  echo "✅ Disco principal es SSD."
+else
+  echo "⚠️ Disco principal es HDD. Un SSD mejora mucho el rendimiento."
+fi
+
+# 3. Verificar GPU activa
+echo "🎮 GPU utilizada:"
+if ! command -v glxinfo &> /dev/null; then
+  echo "ℹ️ Instalando mesa-utils para detectar GPU..."
+  sudo apt install mesa-utils -y
+fi
 glxinfo | grep "OpenGL renderer"
-```
 
-🔍 Si aparece `llvmpipe`, **no tienes aceleración por hardware real**.
-**(If `llvmpipe` shows up, you don’t have real GPU acceleration.)**
+# 4. Verificar aceleración: llvmpipe indica uso de CPU
+gpu_name=$(glxinfo | grep "OpenGL renderer" | cut -d':' -f2)
+if echo "$gpu_name" | grep -iq "llvmpipe"; then
+  echo "⚠️ No tienes aceleración gráfica real (se usa CPU). Considera instalar drivers adecuados."
+else
+  echo "✅ Aceleración gráfica disponible."
+fi
 
-Reinstala o configura los drivers correctos para tu GPU (Intel o AMD).
-**(Install proper GPU drivers for Intel or AMD if needed.)**
+# 5. Verificar conexión a internet
+echo "🌐 Probando conexión a internet (google.com)..."
+if ping -c 2 google.com &> /dev/null; then
+  echo "✅ Conexión a internet activa."
+else
+  echo "❌ No se pudo establecer conexión a internet."
+fi
 
----
-
-### 🚫 E) Ejecutar Brave sin aceleración de GPU
-
-**(Launch Brave with GPU acceleration disabled)**
-
-Puedes iniciar Brave así desde terminal:
-
-```bash
-brave-browser --disable-gpu
-```
-
-Esto fuerza al navegador a renderizar sin usar gráficos acelerados.
-**(This forces software rendering without GPU usage.)**
-
-🧠 Recomendado si otros pasos no funcionan.
-**(Recommended if the above steps don’t solve the issue.)**
-
----
-
-## 🧠 Extra: Crear lanzador personalizado sin aceleración
-
-1. Crea un archivo `.desktop`:
-
-```bash
-nano ~/.local/share/applications/brave-browser-no-gpu.desktop
-```
-
-2. Pega lo siguiente:
-
-```ini
-[Desktop Entry]
-Name=Brave (Sin GPU)
-Comment=Brave con aceleración por hardware desactivada
-Exec=brave-browser --disable-gpu
-Icon=brave-browser
-Terminal=false
-Type=Application
-Categories=Network;WebBrowser;
-```
-
-3. Guarda, cierra y hazlo visible en el menú:
-
-```bash
-chmod +x ~/.local/share/applications/brave-browser-no-gpu.desktop
+echo "✅ Verificación completa."
 ```
 
 ---
 
-## ✅ Resumen final
+### ▶️ Instrucciones para usar el script
 
-| Tarea                                     | Estado      |
-| ----------------------------------------- | ----------- |
-| Sistema actualizado                       | ✅           |
-| Brave instalado desde repositorio oficial | ✅           |
-| Clave GPG y fuente segura añadidas        | ✅           |
-| Recomendaciones de rendimiento aplicadas  | 🧠 Opcional |
-| Acceso directo sin GPU disponible         | 🧠 Opcional |
+1. Abre terminal y ve a la ruta:
+
+```bash
+cd /mnt/hdd/Almacenamiento/Scripts
+```
+
+2. Crea el archivo:
+
+```bash
+nano verificar_equipo_brave.sh
+```
+
+3. Pega el contenido, guarda y cierra (Ctrl+O, Enter, Ctrl+X).
+
+4. Dale permisos de ejecución:
+
+```bash
+chmod +x verificar_equipo_brave.sh
+```
+
+5. Ejecútalo:
+
+```bash
+./verificar_equipo_brave.sh
+```
