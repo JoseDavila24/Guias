@@ -4,38 +4,42 @@
 
 ## 🎯 Objetivo
 
-Detectar, registrar y comparar todo lo que se instala en el sistema, tanto de forma manual como automática, integrando toda la trazabilidad dentro de `/mnt/hdd/Control_Instalaciones/`.
-
----
-
-## 🧱 Estructura recomendada de archivos
-
-Todos los scripts y registros deben almacenarse en:
+Implementar un sistema robusto para **detectar, registrar y comparar automáticamente todo software instalado en Lubuntu**, ya sea mediante comandos, herramientas gráficas o paquetes externos, manteniendo trazabilidad completa en:
 
 ```
 /mnt/hdd/Control_Instalaciones/
-├── historial_instalaciones_auto.log     → Registro automático desde terminal (bash/zsh)
-├── instalaciones_software.txt           → Entradas manuales por fecha y categoría
-├── lista_paquetes_dpkg.txt              → Snapshot actual de paquetes APT
-├── lista_paquetes_snap.txt              → Snapshot actual de Snap
-├── lista_paquetes_flatpak.txt           → Snapshot actual de Flatpak
-├── lista_paquetes_dpkg_anterior.txt     → Snapshot anterior para comparación
-├── diferencias_apt.txt                  → Salida del diff entre snapshots APT
-├── actualizaciones.log                  → Log de ejecución del script
-└── integridad_instaladores.md           → Registro de instaladores verificados
+```
+
+---
+
+## 🗂️ Estructura de archivos recomendada
+
+Todos los registros y capturas deben mantenerse organizados en:
+
+```
+/mnt/hdd/Control_Instalaciones/
+├── historial_instalaciones_auto.log     → Registro automático desde terminal (Bash/Zsh)
+├── instalaciones_software.txt           → Registro manual por categoría y fecha
+├── lista_paquetes_dpkg.txt              → Captura actual de paquetes APT
+├── lista_paquetes_snap.txt              → Captura actual de paquetes Snap
+├── lista_paquetes_flatpak.txt           → Captura actual de paquetes Flatpak
+├── lista_paquetes_dpkg_anterior.txt     → Captura anterior (para comparación)
+├── diferencias_apt.txt                  → Cambios detectados entre capturas APT
+├── actualizaciones.log                  → Log cronológico de ejecuciones
+└── integridad_instaladores.md           → Verificación de instaladores locales
 ```
 
 ---
 
 ## ⚙️ Registro automático desde la terminal
 
-Este registro captura comandos relacionados con instalaciones, tanto en Bash como en Zsh.
+Este mecanismo registra todo comando relacionado con instalación ejecutado en Bash o Zsh, sin intervención manual.
 
-### Para usuarios de Bash (`~/.bashrc`)
+### 🟦 Para usuarios de Bash (`~/.bashrc`)
 
 Agregar al final del archivo:
 
-```
+```bash
 log_installs() {
   case "$BASH_COMMAND" in
     *apt*|*dpkg*|*snap*|*flatpak*|*wget*|*curl*|*make*|*./configure*|*install*)
@@ -46,19 +50,19 @@ log_installs() {
 trap log_installs DEBUG
 ```
 
-Recargar con:
+Recargar la configuración:
 
-```
+```bash
 source ~/.bashrc
 ```
 
 ---
 
-### Para usuarios de Zsh (`~/.zshrc`)
+### 🟪 Para usuarios de Zsh (`~/.zshrc`)
 
 Agregar:
 
-```
+```zsh
 precmd() {
   if [[ "$BUFFER" == *apt* || "$BUFFER" == *dpkg* || "$BUFFER" == *snap* || "$BUFFER" == *flatpak* || "$BUFFER" == *wget* || "$BUFFER" == *curl* || "$BUFFER" == *make* || "$BUFFER" == *install* ]]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $BUFFER" >> /mnt/hdd/Control_Instalaciones/historial_instalaciones_auto.log
@@ -68,19 +72,19 @@ precmd() {
 
 Recargar con:
 
-```
+```bash
 source ~/.zshrc
 ```
 
 ---
 
-## ✍️ Registro manual organizado por fecha
+## ✍️ Registro manual por categoría y fecha
 
-Para registrar instalaciones manuales, AppImages o paquetes externos.
+Para documentar instalaciones externas como AppImages, binarios directos, o herramientas gráficas.
 
-Ejecuta:
+Editar el archivo:
 
-```
+```bash
 nano /mnt/hdd/Control_Instalaciones/instalaciones_software.txt
 ```
 
@@ -100,78 +104,89 @@ Formato sugerido:
 
 ---
 
-## 🔁 Exportación y comparación de estado del sistema
+## 🔄 Captura y comparación del estado del sistema
 
-La funcionalidad de exportar snapshots, detectar diferencias y registrar cambios está ahora centralizada en el script:
+Todas las tareas relacionadas con capturas del sistema y comparación de cambios están centralizadas en el script:
 
 ```
 /mnt/hdd/Almacenamiento/Scripts/actualizar_historial_completo.sh
 ```
 
-Este script realiza las siguientes tareas:
+Este script realiza:
 
-* Exporta listas actualizadas de paquetes APT, Snap y Flatpak
-* Genera `lista_paquetes_dpkg_anterior.txt` automáticamente
-* Compara y genera `diferencias_apt.txt`
-* Registra cada ejecución en `actualizaciones.log`
+* Captura actual de paquetes instalados (`dpkg`, `snap`, `flatpak`)
+* Backup automático del snapshot anterior (`lista_paquetes_dpkg_anterior.txt`)
+* Comparación entre capturas (`diferencias_apt.txt`)
+* Log detallado de ejecución (`actualizaciones.log`)
 
 ---
 
-## 📆 Automatización con `cron`
+## 📅 Automatización con `cron`
 
-Para mantener el monitoreo activo semanalmente, programa el siguiente cronjob:
+Para que el monitoreo se realice automáticamente cada semana:
 
-1. Abre el crontab del usuario:
+1. Abre el archivo crontab del usuario:
 
-```
+```bash
 crontab -e
 ```
 
-2. Agrega esta línea al final:
+2. Añade al final:
 
-```
-0 10 * * 1 bash /mnt/hdd/Almacenamiento/Scripts/actualizar_historial_completo.sh
+```bash
+0 10 * * 1 /bin/bash /mnt/hdd/Almacenamiento/Scripts/actualizar_historial_completo.sh
 ```
 
-(Ejecuta todos los lunes a las 10:00 a.m.)
+📌 Esto ejecutará el script todos los lunes a las 10:00 a.m.
 
 ---
 
-## 🔐 Verificación de integridad de instaladores
+## 🧾 Verificación de integridad de instaladores
 
-Lleva un registro manual de los instaladores descargados para asegurar autenticidad:
+Permite validar que los archivos `.deb`, `.bundle`, `.zip`, etc., provienen de fuentes confiables.
 
-Edita:
+Editar:
 
-```
+```bash
 nano /mnt/hdd/Control_Instalaciones/integridad_instaladores.md
 ```
 
-Formato recomendado:
+Formato sugerido:
 
 ```
 ✅ balenaEtcher-linux-x64-2.1.0.zip
   Fuente: https://www.balena.io
-  SHA256: a1b2c3...
+  SHA256: abc123...
 
 ✅ VMware-Workstation-Full-17.6.3.bundle
   Fuente: https://www.vmware.com
-  SHA256: d4e5f6...
+  SHA256: def456...
 ```
 
-Para obtener el hash:
+Obtener el hash con:
 
+```bash
+sha256sum nombre_del_archivo
 ```
-sha256sum archivo
+
+---
+
+## ♻️ Restauración del sistema (opcional)
+
+Para reinstalar paquetes APT desde un snapshot previo:
+
+```bash
+sudo dpkg --set-selections < lista_paquetes_dpkg.txt
+sudo apt-get dselect-upgrade
 ```
 
 ---
 
 ## ✅ Resultado final
 
-* Registro automático desde la terminal
-* Entradas manuales organizadas y claras
-* Estado del sistema exportado y comparado
-* Cambios rastreados semanalmente
-* Log completo de acciones en el tiempo
-* Todo respaldado en `/mnt/hdd`, organizado y listo para restaurar
+✔ Registro automático de comandos de instalación
+✔ Documentación manual de instalaciones externas
+✔ Captura y comparación programada del estado del sistema
+✔ Registro cronológico de cambios y diferencias
+✔ Control total de integridad de instaladores
+✔ Todo organizado en `/mnt/hdd`, auditable y restaurable en cualquier momento
