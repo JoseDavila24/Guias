@@ -184,9 +184,9 @@ sudo apt-get dselect-upgrade
 
 ## ✅ Resultado final
 
-✔ Registro automático de comandos de instalación
-✔ Documentación manual de instalaciones externas
-✔ Captura y comparación programada del estado del sistema
-✔ Registro cronológico de cambios y diferencias
-✔ Control total de integridad de instaladores
-✔ Todo organizado en `/mnt/hdd`, auditable y restaurable en cualquier momento
+* Registro automático de comandos de instalación
+* Documentación manual de instalaciones externas
+* Captura y comparación programada del estado del sistema
+* Registro cronológico de cambios y diferencias
+* Control total de integridad de instaladores
+* Todo organizado en `/mnt/hdd`, auditable y restaurable en cualquier momento
