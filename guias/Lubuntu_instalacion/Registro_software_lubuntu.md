@@ -1,7 +1,5 @@
 # 📘 Registro y Monitoreo de Software en Lubuntu
 
----
-
 ## 🎯 Objetivo
 
 Implementar un sistema robusto para **detectar, registrar y comparar automáticamente todo software instalado en Lubuntu**, ya sea mediante comandos, herramientas gráficas o paquetes externos, manteniendo trazabilidad completa en:
