@@ -1,26 +1,26 @@
-# 🛡️ Guía Completa de Auditoría en PostgreSQL 16.9 con `pgAudit` (Ubuntu 24.04)
+# Guía Completa de Auditoría en PostgreSQL 16.9 con `pgAudit` (Ubuntu 24.04)
 
-## 🔍 1. ¿Qué es pgAudit y por qué usarlo?
+## 1. Introducción: ¿Qué es `pgAudit` y por qué utilizarlo?
 
-`pgAudit` (PostgreSQL Audit Extension) permite generar registros detallados de las acciones realizadas sobre una base de datos, esenciales para cumplir con normativas como ISO, financieras o gubernamentales.
+`pgAudit` (PostgreSQL Audit Extension) es una extensión que permite generar registros detallados de las operaciones ejecutadas en una base de datos. Su propósito principal es facilitar el cumplimiento de normativas de seguridad y auditoría, como estándares ISO, regulaciones financieras o gubernamentales.
 
-A diferencia de `log_statement`, `pgAudit` ofrece logs estructurados con información sobre qué tabla fue accedida, qué tipo de operación se realizó, y más.
+A diferencia de la opción nativa `log_statement`, `pgAudit` proporciona registros estructurados, en los que se especifica qué tabla fue accedida, qué tipo de operación se realizó y con qué parámetros.
 
-📎 Repositorio oficial: [https://github.com/pgaudit/pgaudit](https://github.com/pgaudit/pgaudit)
-✔️ Para PostgreSQL 16, usa la rama `REL_16_STABLE`.
+Repositorio oficial: [https://github.com/pgaudit/pgaudit](https://github.com/pgaudit/pgaudit)
+Para PostgreSQL 16, debe utilizarse la rama **`REL_16_STABLE`**.
 
 ---
 
-## 🧰 2. Instalación de `pgAudit` desde código fuente
+## 2. Instalación de `pgAudit` desde código fuente
 
-### 2.1 Instala las dependencias necesarias
+### 2.1 Instalación de dependencias
 
 ```bash
 apt update
 apt install -y make build-essential git libkrb5-dev postgresql-server-dev-16
 ```
 
-### 2.2 Clona y compila la extensión `pgAudit`
+### 2.2 Clonado y compilación de la extensión
 
 ```bash
 git clone https://github.com/pgaudit/pgaudit.git
@@ -29,41 +29,37 @@ git checkout REL_16_STABLE
 make install USE_PGXS=1 PG_CONFIG=/usr/bin/pg_config
 ```
 
-> 📝 Asegúrate de que `pg_config` corresponda a PostgreSQL 16:
->
-> ```bash
-> pg_config --version
-> ```
+Verificación de la versión de PostgreSQL:
+
+```bash
+pg_config --version
+```
 
 ---
 
-## ⚙️ 3. Configuración inicial en `postgresql.conf`
+## 3. Configuración inicial en `postgresql.conf`
 
-Edita el archivo de configuración principal de PostgreSQL:
+Edite el archivo de configuración principal:
 
 ```bash
 sudo nano /etc/postgresql/16/main/postgresql.conf
 ```
 
-Asegúrate de incluir o modificar estas líneas:
+Parámetros recomendados:
 
 ```conf
-# Configuración básica de auditoría
 shared_preload_libraries = 'pgaudit'
 
-# Configuración de logs
 logging_collector = on
 log_destination = 'stderr'
-log_directory = 'log'            # relativo a data_directory
+log_directory = 'log'
 log_filename = 'postgresql-%a.log'
-log_line_prefix = '%m [%c] %u@%d %p: '  # Incluye más contexto
+log_line_prefix = '%m [%c] %u@%d %p: '
 log_statement = 'none'
-log_timezone = 'UTC'  # O ajusta a tu zona horaria
+log_timezone = 'UTC'
 ```
 
-> ℹ️ Nota: `shared_preload_libraries` **requiere reinicio completo del servidor**.
-
-Reinicia el servicio:
+Nota: la opción `shared_preload_libraries` requiere reiniciar el servicio.
 
 ```bash
 sudo systemctl restart postgresql
@@ -71,35 +67,25 @@ sudo systemctl restart postgresql
 
 ---
 
-## 🔌 4. Activar `pgAudit` en tu base de datos
+## 4. Activación de `pgAudit` en una base de datos
 
-Conéctate a la base `dvdrental`:
+Conexión a la base de datos:
 
 ```bash
 sudo -u postgres psql -d dvdrental
 ```
 
-Y ejecuta:
+Creación de la extensión:
 
 ```sql
 CREATE EXTENSION pgaudit;
 ```
 
-> 💡 Si restauras esta base frecuentemente, considera automatizar la creación de la extensión post-restauración.
-
 ---
 
-## 🛠️ 5. Configurar auditoría con `pgAudit`
+## 5. Configuración de auditoría con `pgAudit`
 
-### ✅ Opción A — Configuración permanente desde archivo
-
-Edita nuevamente el archivo `postgresql.conf`:
-
-```bash
-sudo nano /etc/postgresql/16/main/postgresql.conf
-```
-
-Agrega estas líneas:
+### 5.1 Configuración permanente en `postgresql.conf`
 
 ```conf
 pgaudit.log = 'read, write, ddl, function'
@@ -107,13 +93,13 @@ pgaudit.log_relation = on
 pgaudit.log_parameter = on
 ```
 
-Reinicia PostgreSQL:
+Aplicación de cambios:
 
 ```bash
 sudo systemctl restart postgresql
 ```
 
-### 🧪 Opción B — Configuración dinámica desde `psql` (para pruebas)
+### 5.2 Configuración dinámica desde `psql`
 
 ```sql
 ALTER SYSTEM SET pgaudit.log = 'read, write, ddl, function';
@@ -124,26 +110,26 @@ SELECT pg_reload_conf();
 
 ---
 
-## 🧪 6. Pruebas de auditoría con la base `dvdrental`
+## 6. Pruebas de auditoría con la base de datos `dvdrental`
 
-### a) Consulta `SELECT`
+* **Consulta SELECT**
 
 ```sql
 SELECT * FROM customer WHERE customer_id = 1;
 ```
 
-➡️ Genera log `READ` para la tabla `customer`.
+Genera un registro de tipo `READ`.
 
-### b) Operaciones `UPDATE` y `DELETE`
+* **Operaciones de escritura**
 
 ```sql
 UPDATE customer SET last_name = 'Ramos' WHERE customer_id = 2;
 DELETE FROM rental WHERE rental_id = 1000;
 ```
 
-➡️ Logs `WRITE` por cada tabla afectada.
+Genera registros de tipo `WRITE`.
 
-### c) Cambios al esquema (`DDL`)
+* **Operaciones DDL**
 
 ```sql
 CREATE TABLE test_audit (id serial PRIMARY KEY);
@@ -151,27 +137,27 @@ ALTER TABLE test_audit ADD COLUMN activo boolean;
 DROP TABLE test_audit;
 ```
 
-➡️ Se generan logs `DDL`.
+Genera registros de tipo `DDL`.
 
-### d) Bloque anónimo (`DO`)
+* **Bloque anónimo**
 
 ```sql
 DO $$ BEGIN EXECUTE 'CREATE TABLE temp_test (x int)'; END $$;
 ```
 
-➡️ Se genera un log `FUNCTION` y otro `DDL`.
+Genera registros de tipo `FUNCTION` y `DDL`.
 
 ---
 
-## 🗂️ 7. Revisión y filtrado de logs generados
+## 7. Revisión y filtrado de registros
 
-### a) Ubica tu directorio de datos:
+Ubicación del directorio de datos:
 
 ```sql
 SHOW data_directory;
 ```
 
-### b) Revisa los archivos de log:
+Revisión de archivos de log:
 
 ```bash
 cd /var/lib/postgresql/16/main/log
@@ -187,68 +173,63 @@ Ejemplo de salida:
 
 ---
 
-## 🧾 8. Interpretación de logs `pgAudit`
+## 8. Interpretación de los registros de `pgAudit`
 
-Cada línea de log contiene varios campos separados por coma. A continuación se muestra cómo interpretarlos:
-
-| Campo             | Descripción                                    |
-| ----------------- | ---------------------------------------------- |
-| `SESSION`         | Tipo de auditoría (`SESSION` u `OBJECT`)       |
-| `3,1`             | ID de sesión y sub-ID                          |
-| `READ`            | Clase de auditoría (`READ`, `WRITE`, etc.)     |
-| `SELECT`          | Comando SQL ejecutado                          |
-| `TABLE`           | Tipo de objeto                                 |
-| `public.customer` | Objeto afectado                                |
-| `SELECT *...`     | Sentencia ejecutada                            |
-| `<not logged>`    | Parámetros si `pgaudit.log_parameter` está off |
+| Campo             | Descripción                                                              |
+| ----------------- | ------------------------------------------------------------------------ |
+| `SESSION`         | Tipo de auditoría (`SESSION` u `OBJECT`).                                |
+| `3,1`             | Identificador de sesión y sub-identificador.                             |
+| `READ`            | Categoría de la acción (`READ`, `WRITE`, etc.).                          |
+| `SELECT`          | Comando SQL ejecutado.                                                   |
+| `TABLE`           | Tipo de objeto afectado.                                                 |
+| `public.customer` | Objeto sobre el que se ejecutó la acción.                                |
+| `SELECT *...`     | Sentencia SQL completa.                                                  |
+| `<not logged>`    | Parámetros no registrados (si `pgaudit.log_parameter` está desactivado). |
 
 ---
 
-## ✅ 9. Clases más comunes de auditoría en `pgAudit`
+## 9. Clases principales de auditoría en `pgAudit`
 
-| Clase      | Acciones auditadas                           |
-| ---------- | -------------------------------------------- |
-| `READ`     | `SELECT`, `COPY FROM`                        |
-| `WRITE`    | `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`     |
-| `DDL`      | Cambios de esquema (`CREATE`, `ALTER`, etc.) |
-| `FUNCTION` | Bloques `DO` y funciones PL/pgSQL            |
-
----
-
-## 🎯 10. Ventajas clave frente a `log_statement`
-
-* 🎯 Estructura de log clara y parseable
-* 🎯 Incluye tipo de operación, tabla y detalles
-* 🎯 Fácil integración con sistemas de auditoría externos
-* 🎯 Reduce ruido innecesario (ej. queries internas de `pg_catalog`)
+| Clase      | Acciones auditadas                                 |
+| ---------- | -------------------------------------------------- |
+| `READ`     | Consultas `SELECT` y operaciones `COPY FROM`.      |
+| `WRITE`    | `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`.          |
+| `DDL`      | Cambios en el esquema (`CREATE`, `ALTER`, `DROP`). |
+| `FUNCTION` | Ejecución de funciones y bloques anónimos.         |
 
 ---
 
-## 🔐 11. Buenas prácticas adicionales
+## 10. Ventajas frente a `log_statement`
 
-✅ Para producción, considera implementar las siguientes prácticas:
+* Registros estructurados y fácilmente procesables.
+* Inclusión explícita de tipo de operación y objeto afectado.
+* Compatibilidad con sistemas de auditoría externos.
+* Reducción de ruido generado por consultas internas del sistema.
 
-* **Permisos restrictivos en logs**:
+---
 
-  ```bash
-  chmod 640 /var/lib/postgresql/16/main/log/*
-  ```
+## 11. Buenas prácticas adicionales
 
-* **Rotación de logs**:
+* **Permisos restrictivos sobre los archivos de log**
 
-  ```conf
-  log_rotation_age = 1d
-  log_rotation_size = 100MB
-  ```
+```bash
+chmod 640 /var/lib/postgresql/16/main/log/*
+```
 
-* **Envío a syslog o centralización**:
+* **Rotación de registros**
 
-  * Usa `syslog`, `fluentd`, `rsyslog`, o `journalbeat` para enviar los logs a una solución SIEM.
+```conf
+log_rotation_age = 1d
+log_rotation_size = 100MB
+```
 
-* **Visualización con herramientas**:
+* **Centralización de logs**
+  Configurar envío a sistemas como `syslog`, `rsyslog`, `fluentd` o `journalbeat`.
 
-  * `ELK Stack (Elasticsearch + Kibana)`, `Splunk`, `Datadog`, `pganalyze`.
+* **Integración con plataformas de análisis**
+  Uso de herramientas como **ELK Stack**, **Splunk**, **Datadog** o **pganalyze**.
 
-* **Política de retención**:
+* **Definición de políticas de retención**
+  Establecer políticas de acuerdo con normativas aplicables (por ejemplo, GDPR, SOX).
 
-  * Define una política clara según regulaciones (GDPR, SOX, etc.)
+---
