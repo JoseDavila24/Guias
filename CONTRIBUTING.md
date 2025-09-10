@@ -1,92 +1,90 @@
-# 📘 GUÍA PARA CONTRIBUIR AL PROYECTO Y USAR GIT
+# Guía para Contribuir al Proyecto y Utilizar Git
 
-Este documento está dirigido a todos los colaboradores que deseen formar parte activa del desarrollo de este proyecto. Aquí encontrarás tanto la base para trabajar con Git como las normas y procesos para contribuir de forma clara, ordenada y efectiva.
-
----
-
-## 🤝 A. CONTRIBUIR ES COLABORAR
-
-¡Gracias por tu interés en contribuir!
-Nuestro objetivo es mantener un entorno colaborativo donde todos puedan aportar, crecer y mejorar el proyecto en conjunto. Para ello:
-
-* Promovemos **colaboración constante** entre desarrolladores.
-* Buscamos **transparencia y trazabilidad** en todos los cambios.
-* Valoramos el **respeto, la claridad y el orden** en el trabajo en equipo.
+Este documento está dirigido a todos los colaboradores interesados en participar activamente en el desarrollo de este proyecto. Aquí se presentan las directrices fundamentales para el uso de Git, así como las normas y procedimientos establecidos para garantizar una colaboración clara, organizada y eficiente.
 
 ---
 
-## 🧾 B. PROCESO DE CONTRIBUCIÓN
+## A. Contribuir es Colaborar
 
-### 1. FORK Y CLONACIÓN
+Agradecemos su interés en contribuir a este proyecto. Nuestro objetivo es mantener un entorno de trabajo colaborativo que permita a todos los participantes aportar, aprender y mejorar de manera conjunta. Para ello:
 
-1. Haz un **fork** del repositorio original.
-2. Clona tu copia a tu entorno local:
+* Se promueve la **colaboración constante** entre desarrolladores.
+* Se garantiza la **transparencia y trazabilidad** en cada cambio realizado.
+* Se valora el **respeto, la claridad y el orden** en todas las interacciones.
+
+---
+
+## B. Proceso de Contribución
+
+### 1. Creación de un Fork y Clonación
+
+1. Realice un *fork* del repositorio original.
+2. Clone su copia en el entorno local:
 
 ```bash
 git clone https://github.com/tu-usuario/nombre-del-repo.git
 cd nombre-del-repo
 ```
 
-### 2. CREAR UNA RAMA DE TRABAJO
+### 2. Creación de una Rama de Trabajo
 
-Siempre trabaja sobre una rama distinta a `main`. Usa nombres descriptivos:
+Trabaje siempre en una rama distinta de `main`. Utilice nombres descriptivos:
 
 ```bash
 git checkout -b feature/nueva-funcionalidad
 ```
 
-### 3. REALIZA CAMBIOS Y CONFÍRMALOS
+### 3. Realización de Cambios y Confirmación
 
-Haz tus modificaciones, asegúrate de que el código funcione, y luego:
+Efectúe las modificaciones necesarias, verifique su correcto funcionamiento y confirme los cambios:
 
 ```bash
 git add .
 git commit -m "feat: agrega validación en formulario"
 ```
 
-> 📌 Es importante que el mensaje de commit sea **claro y específico**.
+Es fundamental que los mensajes de confirmación sean **claros y específicos**.
 
-### 4. HAZ PUSH Y ENVÍA TU CONTRIBUCIÓN
+### 4. Envío de Cambios y Pull Request
 
 ```bash
 git push origin feature/nueva-funcionalidad
 ```
 
-Después, abre un **Pull Request (PR)** desde tu rama hacia `main`.
-Incluye en la descripción:
+Posteriormente, abra un **Pull Request (PR)** desde su rama hacia `main`, incluyendo en la descripción:
 
-* Qué hiciste.
-* Por qué lo hiciste.
-* Si el PR cierra un issue: `Closes #número`.
-
----
-
-## 🧠 C. BUENAS PRÁCTICAS DE CONTRIBUCIÓN
-
-* ✅ **Escribe código limpio**, comentado y con nombres descriptivos.
-* ✅ **No alteres funcionalidades existentes** sin justificación.
-* ✅ **Agrega pruebas** si introduces nueva lógica.
-* ✅ **Documenta** todo lo necesario para otros desarrolladores.
-
-> Tu aporte no solo es código, también es contexto y claridad para el equipo.
+* Qué cambios fueron realizados.
+* La justificación de dichos cambios.
+* Referencia a un *issue* asociado, si corresponde (`Closes #número`).
 
 ---
 
-## 🌿 D. ESTRUCTURA DE RAMAS
+## C. Buenas Prácticas de Contribución
 
-Utilizamos una estructura de ramas sencilla y efectiva:
+* Escribir **código claro y documentado**.
+* Evitar alterar funcionalidades existentes sin justificación.
+* Incluir **pruebas** al introducir nueva lógica.
+* Aportar documentación suficiente para otros colaboradores.
+
+La contribución no se limita al código: el contexto y la claridad también son esenciales.
+
+---
+
+## D. Estructura de Ramas
+
+Se emplea una estructura de ramas simple y funcional:
 
 * `main`: versión estable.
-* `develop`: integración de nuevas funcionalidades (si aplica).
-* `feature/*`: nuevas características.
-* `fix/*`: correcciones de errores.
-* `docs/*`: cambios en documentación.
+* `develop`: integración de nuevas funcionalidades (si corresponde).
+* `feature/*`: incorporación de nuevas características.
+* `fix/*`: corrección de errores.
+* `docs/*`: modificaciones en la documentación.
 
 ---
 
-## ✍️ E. COMMIT CLAROS Y CONSISTENTES
+## E. Convenciones para Mensajes de Commit
 
-Usa esta convención en tus commits:
+Formato recomendado:
 
 ```
 tipo: descripción breve del cambio
@@ -98,37 +96,35 @@ Ejemplos:
 * `fix: corrige error de validación`
 * `docs: actualiza guía de contribución`
 
-Tipos válidos: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`.
+Tipos aceptados: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`.
 
 ---
 
-## 🔄 F. GESTIÓN DE PULL REQUESTS
+## F. Gestión de Pull Requests
 
-Cuando envíes un Pull Request:
+Al enviar un Pull Request:
 
-* Explica **qué problema resuelve** tu contribución.
-* Menciona si **necesita revisión específica**.
-* Mantente disponible para responder comentarios o hacer ajustes.
-
----
-
-## ⚖️ G. CÓDIGO DE CONDUCTA
-
-Este proyecto sigue un **Código de Conducta** para garantizar un ambiente:
-
-* Respetuoso
-* Colaborativo
-* Seguro para todos
-
-Léelo antes de contribuir. Tu participación responsable fortalece la comunidad.
+* Explique el problema que resuelve la contribución.
+* Indique si requiere revisión o retroalimentación específica.
+* Esté disponible para responder observaciones o realizar ajustes.
 
 ---
 
-## 🔧 H. GUÍA BÁSICA DE GIT PARA CONTRIBUIDORES
+## G. Código de Conducta
 
-Si eres nuevo en Git, aquí tienes lo esencial:
+El proyecto se rige por un **Código de Conducta** cuyo objetivo es garantizar un entorno:
 
-### INSTALACIÓN Y CONFIGURACIÓN
+* Respetuoso.
+* Colaborativo.
+* Seguro para todos los participantes.
+
+Se solicita leer y aceptar el Código de Conducta antes de realizar contribuciones.
+
+---
+
+## H. Guía Básica de Git para Contribuidores
+
+### Instalación y Configuración
 
 **Ubuntu/Linux:**
 
@@ -138,17 +134,17 @@ sudo apt update && sudo apt install git
 
 **Windows:**
 
-* Descarga desde [https://git-scm.com/downloads](https://git-scm.com/downloads)
-* Instala y abre Git Bash
+* Descargue desde [https://git-scm.com/downloads](https://git-scm.com/downloads).
+* Instale y utilice Git Bash.
 
-**Configura tu identidad:**
+**Configuración inicial de identidad:**
 
 ```bash
-git config --global user.name "Tu Nombre"
-git config --global user.email "tucorreo@example.com"
+git config --global user.name "Su Nombre"
+git config --global user.email "su-correo@example.com"
 ```
 
-### FLUJO RESUMIDO
+### Flujo de Trabajo Resumido
 
 ```bash
 # Clonar repositorio
@@ -157,7 +153,7 @@ git clone https://github.com/tu-usuario/nombre-del-repo.git
 # Crear rama
 git checkout -b fix/ajuste-login
 
-# Hacer cambios
+# Realizar cambios
 git add .
 git commit -m "fix: corrige validación en login"
 
@@ -167,15 +163,16 @@ git push origin fix/ajuste-login
 
 ---
 
-## ✅ RECOMENDACIONES FINALES
+## Recomendaciones Finales
 
-* 🔄 Haz `git pull` frecuentemente para mantener tu rama actualizada.
-* ✏️ Sé detallado en tus mensajes y en las descripciones de los PR.
-* 🧼 Usa `.gitignore` para no subir archivos innecesarios.
-* 🙌 Colabora de manera abierta: tu trabajo impacta a todo el equipo.
+* Actualice su rama con frecuencia mediante `git pull`.
+* Sea detallado en los mensajes de commit y descripciones de los Pull Requests.
+* Utilice `.gitignore` para evitar subir archivos innecesarios.
+* Mantenga una comunicación abierta y colaborativa: cada aporte contribuye al valor del proyecto.
 
 ---
 
-**Tu contribución cuenta.**
-Ya sea pequeña o grande, cada mejora suma al valor del proyecto.
-Gracias por ser parte de esta comunidad. ¡Vamos a construir juntos algo increíble! 🚀
+**Toda contribución es valiosa.**
+Independientemente de su magnitud, cada mejora fortalece el proyecto y su comunidad.
+
+---
