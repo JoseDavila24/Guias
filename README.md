@@ -38,5 +38,3 @@ Agradecemos su interés en este espacio de aprendizaje y colaboración.
 **Comencemos a construir conocimiento de manera conjunta.**
 
 ---
-
-¿Quieres que lo prepare como una **plantilla de introducción estándar** (por ejemplo, para usar en todos tus repositorios), o prefieres que quede como una **presentación formal específica** para este proyecto en particular?
