@@ -1,96 +1,98 @@
-# 🧩 Guía Universal para Activar y Usar SSH (Windows & Linux)
+# Guía Básica y Universal para Activar y Utilizar SSH
 
-## ✅ 1. ¿Qué es SSH y para qué sirve?
+## 1. Introducción: ¿Qué es SSH?
 
-**SSH (Secure Shell)** es un protocolo que permite conectarse de forma segura a otro equipo remoto para administrar, transferir archivos o ejecutar comandos, todo desde una terminal o aplicación gráfica.
+**SSH (Secure Shell)** es un protocolo de comunicación que permite establecer conexiones seguras entre equipos remotos. A través de él es posible:
 
----
+* Administrar servidores y sistemas.
+* Transferir archivos de manera cifrada.
+* Ejecutar comandos de forma remota.
 
-## 🛠️ 2. Requisitos generales
-
-* Acceso a un sistema que **actúe como servidor** (Linux, Windows, WSL).
-* Otro sistema que se usará como **cliente SSH**.
-* Ambos deben estar en la **misma red local** o tener direcciones IP públicas accesibles.
+Es una herramienta fundamental en la administración de sistemas y redes.
 
 ---
 
-## 📦 3. Activar o instalar el servidor SSH
+## 2. Requisitos previos
 
-### 🔸 En Linux (cualquier distribución):
+1. Un equipo que funcionará como **servidor SSH** (generalmente con Linux, aunque también es posible en Windows).
+2. Un equipo que actuará como **cliente SSH** (Linux, macOS o Windows).
+3. Conectividad entre ambos sistemas:
 
-1. Instala el servicio OpenSSH:
-
-   ```bash
-   sudo apt install openssh-server     # Debian/Ubuntu
-   sudo dnf install openssh-server     # Fedora/RHEL
-   sudo pacman -S openssh              # Arch
-   ```
-
-2. Activa y arranca el servicio:
-
-   ```bash
-   sudo systemctl enable ssh
-   sudo systemctl start ssh
-   ```
-
-3. Verifica que esté activo:
-
-   ```bash
-   sudo systemctl status ssh
-   ```
+   * En una **red local**.
+   * O mediante **dirección IP pública** y acceso a Internet.
 
 ---
 
-### 🔸 En Windows (opciones posibles):
+## 3. Instalación y activación del servidor SSH
 
-#### Opción A: Activar el servidor SSH nativo (Windows 10/11 Pro)
+### En Linux (todas las distribuciones)
 
-1. Abre PowerShell como administrador.
-2. Ejecuta:
+1. Instalar OpenSSH:
 
-   ```powershell
-   Add-WindowsCapability -Online -Name OpenSSH.Server
-   Start-Service sshd
-   Set-Service -Name sshd -StartupType 'Automatic'
-   ```
+```bash
+sudo apt install openssh-server     # Debian/Ubuntu
+sudo dnf install openssh-server     # Fedora/RHEL
+sudo pacman -S openssh              # Arch
+```
 
-> Esto habilita el servidor SSH de forma permanente.
+2. Habilitar y arrancar el servicio:
 
-#### Opción B: Usar WSL (Windows Subsystem for Linux)
+```bash
+sudo systemctl enable ssh
+sudo systemctl start ssh
+```
 
-Si tienes una distro Linux en WSL (como Ubuntu):
+3. Verificar estado del servicio:
 
-1. Instala el servidor SSH en WSL:
-
-   ```bash
-   sudo apt install openssh-server
-   sudo service ssh start
-   ```
-
-> Solo funciona dentro del entorno WSL, ideal para pruebas.
+```bash
+sudo systemctl status ssh
+```
 
 ---
 
-## 🔒 4. Configurar parámetros de seguridad
+### En Windows
 
-Edición del archivo (solo en Linux):
+#### Opción A: Servidor SSH nativo (Windows 10/11 Pro)
+
+En PowerShell con privilegios de administrador:
+
+```powershell
+Add-WindowsCapability -Online -Name OpenSSH.Server
+Start-Service sshd
+Set-Service -Name sshd -StartupType 'Automatic'
+```
+
+#### Opción B: WSL (Windows Subsystem for Linux)
+
+Dentro de la distribución Linux instalada en WSL:
+
+```bash
+sudo apt install openssh-server
+sudo service ssh start
+```
+
+---
+
+## 4. Configuración básica de seguridad
+
+Archivo de configuración en Linux:
 
 ```bash
 sudo nano /etc/ssh/sshd_config
 ```
 
-Recomendaciones:
+Recomendaciones mínimas:
 
 ```ini
-Port 2222                   # Cambia el puerto (opcional)
-PermitRootLogin no          # No permitir acceso como root
-PasswordAuthentication yes  # Permitir contraseña (puedes cambiar luego)
-PermitEmptyPasswords no
-AllowUsers tu_usuario       # (opcional) Restringir usuarios autorizados
+Port 2222                   # Cambiar puerto por seguridad
+PermitRootLogin no          # Deshabilitar acceso directo como root
+PasswordAuthentication yes  # Permitir autenticación con contraseña
+PermitEmptyPasswords no     # No permitir contraseñas vacías
+AllowUsers usuario1 usuario2 # (opcional) Restringir usuarios autorizados
 UseDNS no
 ```
 
-Reinicia el servicio para aplicar los cambios:
+Aplicar cambios:
 
 ```bash
 sudo systemctl restart ssh
@@ -98,81 +100,68 @@ sudo systemctl restart ssh
 
 ---
 
-## 🌐 5. Conocer la IP del servidor
+## 5. Obtener la dirección IP del servidor
 
-En Linux:
+* **Linux:**
+
+  ```bash
+  ip a   # o: hostname -I
+  ```
+* **Windows:**
+
+  ```powershell
+  ipconfig
+  ```
+
+---
+
+## 6. Autenticación mediante claves (opcional y recomendado)
+
+1. Generar un par de claves en el cliente:
 
 ```bash
-ip a   # o bien: hostname -I
+ssh-keygen -t ed25519
 ```
 
-En Windows:
+2. Copiar la clave pública al servidor:
 
-```powershell
-ipconfig
+```bash
+ssh-copy-id -p 2222 usuario@ip-del-servidor
 ```
 
-> Necesitarás esta IP para conectarte desde otro dispositivo.
+*(En Windows, copiar manualmente el contenido de `id_ed25519.pub` a `~/.ssh/authorized_keys` del servidor.)*
 
 ---
 
-## 🔐 6. (Opcional) Autenticación sin contraseña con clave SSH
+## 7. Conexión desde el cliente
 
-En el **cliente** (Linux, macOS, WSL o PowerShell con OpenSSH):
-
-1. Genera una clave:
-
-   ```bash
-   ssh-keygen -t ed25519
-   ```
-
-2. Copia la clave al servidor:
-
-   ```bash
-   ssh-copy-id -p 2222 usuario@ip-del-servidor   # En Linux
-   ```
-
-> En Windows, puedes copiar manualmente el contenido de `~/.ssh/id_ed25519.pub` al archivo `~/.ssh/authorized_keys` del servidor.
-
----
-
-## 🪟 7. Conexión desde Windows
-
-### ✅ Opción A: PowerShell o CMD
-
-```powershell
-ssh -p 2222 usuario@192.168.1.X
-```
-
-> SSH ya viene instalado en Windows 10/11 por defecto.
-
----
-
-### ✅ Opción B: Cliente gráfico PuTTY
-
-1. Descarga desde: [https://www.putty.org](https://www.putty.org)
-
-2. Configura:
-
-   * Host Name: `192.168.1.X`
-   * Port: `2222`
-   * Connection Type: `SSH`
-
-3. Clic en **Open**, inicia sesión con tu usuario.
-
----
-
-## 🐧 8. Conexión desde Linux/macOS
+* **Desde Linux o macOS:**
 
 ```bash
 ssh -p 2222 usuario@192.168.1.X
 ```
 
+* **Desde Windows (PowerShell o CMD):**
+
+```powershell
+ssh -p 2222 usuario@192.168.1.X
+```
+
+* **Cliente gráfico PuTTY:**
+
+  1. Descargar desde [https://www.putty.org](https://www.putty.org).
+  2. Configurar:
+
+     * Host: `192.168.1.X`
+     * Puerto: `2222`
+     * Tipo de conexión: `SSH`
+  3. Seleccionar **Open** e iniciar sesión.
+
 ---
 
-## 🔐 9. Activar Firewall (opcional, recomendado)
+## 8. Configuración del cortafuegos (opcional y recomendable)
 
-### En Linux (UFW como ejemplo):
+* **Linux (UFW como ejemplo):**
 
 ```bash
 sudo apt install ufw
@@ -182,29 +171,14 @@ sudo ufw allow 2222/tcp
 sudo ufw enable
 ```
 
-### En Windows:
-
-* Usa el **Firewall de Windows Defender** para permitir el puerto 2222 TCP.
-
----
-
-## 📊 10. (Opcional) Dashboard en la terminal
-
-En Linux/macOS/WSL, edita `~/.bash_profile` o `~/.bashrc`:
-
-```bash
-clear
-echo "🖥️  $HOSTNAME - $USER"
-echo "📅 Fecha: $(date)"
-echo "💡 Uptime: $(uptime -p)"
-echo "📈 Carga: $(uptime | awk -F'load average:' '{ print $2 }')"
-```
+* **Windows:**
+  Configurar **Firewall de Windows Defender** para permitir el puerto definido (ej. 2222 TCP).
 
 ---
 
-## 🧪 Verifica tu conexión
+## 9. Comprobación de la conexión
 
-Desde cualquier cliente compatible:
+Desde cualquier cliente:
 
 ```bash
 ssh -p 2222 usuario@192.168.1.X
@@ -212,8 +186,24 @@ ssh -p 2222 usuario@192.168.1.X
 
 ---
 
-## 🧰 Extras recomendados para administración remota (Linux)
+## 10. Herramientas útiles para la administración remota (Linux)
+
+Se recomienda instalar las siguientes utilidades:
 
 ```bash
 sudo apt install vim htop curl wget git rsync tmux net-tools
+```
+
+---
+
+## Recomendaciones finales
+
+* Cambiar el puerto por defecto (22 → uno alternativo).
+* Deshabilitar el inicio de sesión remoto como **root**.
+* Usar claves SSH en lugar de contraseñas cuando sea posible.
+* Mantener el sistema y OpenSSH siempre actualizados.
+* Revisar periódicamente los registros:
+
+```bash
+sudo journalctl -u ssh
 ```
