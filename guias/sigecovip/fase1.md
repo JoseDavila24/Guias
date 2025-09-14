@@ -1,37 +1,59 @@
-# Fase 1 — Creación del proyecto SIGECOVIP con Create-T3-App (orientada a migraciones)
+# Fase 1 — Creación del proyecto SIGECOVIP con Create-T3-App
 
-**Objetivo:** generar el proyecto base `sigecovip` con el stack aprobado (Create-T3-App + PostgreSQL en Docker + Prisma + tRPC + NextAuth.js), dejando lista la **infraestructura de migraciones versionadas** para las entidades: `Usuario`, `Comerciante`, `Inspección`, `Reporte`, `Auditoría`.
+**Objetivo:** generar el proyecto base `sigecovip` con el stack aprobado (**Create-T3-App + PostgreSQL en Docker + Prisma + tRPC + NextAuth.js**), dejando lista la **infraestructura de migraciones** para soportar las entidades definidas en el diseño: `Usuario`, `Comerciante`, `Inspección`, `Reporte`, `Auditoría`.
 
 ---
 
-## 1) Scaffold del proyecto
+## 1. Scaffold inicial
 
-En `C:\Dev`:
+En tu carpeta de trabajo (`D:\Dev\sigecovip`):
 
 ```powershell
-cd C:\Dev
+cd D:\Dev
 pnpm.cmd dlx create-t3-app@latest sigecovip
 ```
 
-Selecciona:
+Selección:
 
-* TypeScript: **Sí**
-* Tailwind CSS: **Sí**
-* tRPC: **Sí**
-* Auth provider: **NextAuth.js**
-* ORM: **Prisma**
-* App Router: **Sí**
-* DB provider: **PostgreSQL**
-* Lint/Format: **ESLint + Prettier**
-* Init Git: **Sí**
-* Run pnpm install: **Sí**
-* Import alias: **@/**
+* TypeScript ✅
+* Tailwind ✅
+* tRPC ✅
+* Auth provider: NextAuth.js ✅
+* ORM: Prisma ✅
+* App Router ✅
+* DB provider: PostgreSQL ✅
+* ESLint + Prettier ✅
+* Init Git ✅
+* Run pnpm install ✅
+* Import alias: @/ ✅
 
 ---
 
-## 2) Variables de entorno
+## 2. Base de datos en Docker
 
-Crea/edita `.env` en la raíz:
+Levantaste un contenedor PostgreSQL 16:
+
+```powershell
+docker run --name pg16-sigecovip `
+  -e POSTGRES_USER=sigeco `
+  -e POSTGRES_PASSWORD=sigeco_pass `
+  -e POSTGRES_DB=sigecovip `
+  -p 5432:5432 -d postgres:16
+```
+
+Verificación:
+
+```powershell
+docker ps
+```
+
+Resultado: contenedor `pg16-sigecovip` corriendo en `localhost:5432`.
+
+---
+
+## 3. Variables de entorno
+
+Archivo `.env` configurado:
 
 ```dotenv
 # ===========================================
@@ -54,8 +76,8 @@ NEXTAUTH_URL="http://localhost:3000"
 # Proveedores externos (vacíos por ahora)
 # ===========================================
 # Ejemplo con Discord (no se usará en SIGECOVIP, puedes dejarlo vacío o eliminarlo)
-AUTH_DISCORD_ID=""
-AUTH_DISCORD_SECRET=""
+AUTH_DISCORD_ID="dummy"
+AUTH_DISCORD_SECRET="dummy"
 
 # Tokens que sí usarás en SIGECOVIP
 NEXT_PUBLIC_MAPBOX_TOKEN=
@@ -72,13 +94,11 @@ FIREBASE_ADMIN_PRIVATE_KEY=""
 DATABASE_URL="postgresql://sigeco:sigeco_pass@localhost:5432/sigecovip?schema=public"
 ```
 
-> Mantén `.env` fuera de Git. Crea un `.env.example` sin credenciales.
-
 ---
 
-## 3) Modelo de datos (Prisma centrado en migraciones)
+## 4. Modelo de datos (Prisma)
 
-`prisma/schema.prisma`:
+En `prisma/schema.prisma`:
 
 ```prisma
 generator client {
@@ -185,16 +205,11 @@ model Auditoria {
 }
 ```
 
-> En fases siguientes podemos endurecer con enums para `formato/accion/modulo`, `onDelete` e índices.
-
 ---
 
-## 4) Scripts en `package.json` (migraciones versionadas)
-
-Asegura esta sección:
+## 5. Scripts de migración (`package.json`)
 
 ```json
-{
   "scripts": {
     "dev": "next dev --turbo",
     "build": "next build",
@@ -215,78 +230,53 @@ Asegura esta sección:
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
 
     "check": "next lint && tsc --noEmit",
+
     "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "ts-node --transpile-only prisma/seed.ts"
-  }
-}
-```
-
-> Nota: Prisma avisa que `package.json#prisma` será deprecado en Prisma 7. Más adelante podemos mover el seed a `prisma.config.ts`. No te bloquea hoy.
-
----
-
-## 5) Base de datos en Docker
-
-```powershell
-docker run --name pg16-sigecovip `
-  -e POSTGRES_USER=sigeco `
-  -e POSTGRES_PASSWORD=sigeco_pass `
-  -e POSTGRES_DB=sigecovip `
-  -p 5432:5432 -d postgres:16
-
-docker ps   # contenedor Up
-```
-
-Tu `.env` ya apunta a:
-
-```
-DATABASE_URL="postgresql://sigeco:sigeco_pass@localhost:5432/sigecovip?schema=public"
+  },
 ```
 
 ---
 
-## 6) Migración inicial (creada, aún no aplicada)
+## 6. Migración inicial
 
-Con Postgres arriba:
+Se ejecutó:
 
 ```powershell
 pnpm.cmd prisma migrate dev --name init --create-only
 pnpm.cmd prisma generate
-pnpm.cmd prisma migrate status   # debe mostrar 'init' como pending
 ```
 
-Se crea `prisma/migrations/<timestamp>_init/migration.sql` y se genera Prisma Client.
-La migración queda **pendiente** para aplicar en Fase 2.
+Resultado:
+
+* Carpeta `prisma/migrations/..._init/` creada (SQL versionado).
+* Prisma Client generado.
+* Estado: **migración pendiente de aplicar**.
 
 ---
 
-## 7) Smoke test del proyecto
+## 7. Smoke test
 
 ```powershell
 pnpm.cmd dev
 ```
 
-Abre `http://localhost:3000` y verifica el scaffold.
+✔ Proyecto corriendo en `http://localhost:3000`.
+⚠ Se agregaron variables dummy para evitar error de validación (`AUTH_DISCORD_ID` / `AUTH_DISCORD_SECRET`).
 
 ---
 
-## 8) Checklist de cierre (Fase 1)
+## ✅ Estado al finalizar Fase 1
 
-* [x] Proyecto T3 creado (Next.js + TS + Tailwind + tRPC + Auth.js + Prisma).
-* [x] `.env` configurado (AUTH\_SECRET, DATABASE\_URL y placeholders externos).
-* [x] Docker Postgres 16 **Up** en `localhost:5432`.
-* [x] Migración inicial **creada** (`--create-only`), **no aplicada**.
-* [x] Prisma Client generado; scripts de migración **sin `db push`**.
-* [x] Commit de `prisma/schema.prisma` y `prisma/migrations/**` (sin `.env`).
+* Proyecto T3 creado y funcionando.
+* PostgreSQL corriendo en Docker (`pg16-sigecovip`).
+* `.env` listo con DB, NextAuth y placeholders.
+* Modelo de datos implementado en `schema.prisma` según el diseño.
+* Migración inicial versionada (sin aplicar aún).
+* Prisma Client generado.
+* Scripts de migración y seed listos.
+* Validación de arranque (`pnpm dev`) exitosa.
 
 ---
-
-### Notas (para siguientes fases)
-
-* **Aplicar migraciones** en Fase 2: `pnpm prisma:migrate:deploy` y abrir `pnpm prisma:studio`.
-* Opcional: mover seed a `prisma.config.ts` (quita el warning para Prisma 7).
-* Endurecer el modelo con enums/índices/`onDelete` cuando fijemos reglas de negocio definitivas.
-
-Listo. Esta es tu **Fase 1 oficial**, considerando que **ya levantaste Postgres** y que **ajustaste el `.env`** antes de crear la migración.
