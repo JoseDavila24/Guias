@@ -78,7 +78,7 @@ DATABASE_URL="postgresql://sigeco:sigeco_pass@localhost:5432/sigecovip?schema=pu
 
 ## 3. Prisma centrado en migraciones
 
-En `prisma/schema.prisma` confirma:
+En `prisma/schema.prisma` pega lo siguiente:
 
 ```prisma
 generator client {
@@ -89,32 +89,175 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-```
 
-Deja el schema vacío o con una tabla mínima (`Usuario`) para crear la primera migración.
-Esto permitirá versionar el esquema desde el inicio, como pide la metodología.
+enum RolUsuario {
+  INSPECTOR
+  COORDINADOR
+}
+
+enum EstatusOperativo {
+  VIGENTE
+  IRREGULAR
+  SANCIONADO
+  EN_TRAMITE
+}
+
+model Usuario {
+  id            String    @id @default(uuid())
+  nombre        String
+  email         String    @unique
+  hashPassword  String
+  rol           RolUsuario
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+
+  inspecciones  Inspeccion[] @relation("UsuarioInspecciones")
+  reportes      Reporte[]    @relation("UsuarioReportes")
+  auditorias    Auditoria[]
+}
+
+model Comerciante {
+  id               String    @id @default(uuid())
+  titularNombre    String
+  giro             String
+  superficieM2     Decimal?  @db.Decimal(10, 2)
+  diasOperacion    String?
+  horarioOperacion String?
+  tipoMontaje      String?
+  licenciaPermiso  String?
+  direccion        String?
+  latitud          Decimal?  @db.Decimal(9, 6)
+  longitud         Decimal?  @db.Decimal(9, 6)
+  organizacion     String?
+  estatus          EstatusOperativo
+  creadoEn         DateTime  @default(now())
+  actualizadoEn    DateTime  @updatedAt
+
+  inspecciones     Inspeccion[]
+  reportes         ReporteComerciante[] // N:M con Reporte
+}
+
+model Inspeccion {
+  id            String      @id @default(uuid())
+  fechaHora     DateTime    @default(now())
+  notas         String?
+  evidenciasUrl String?
+
+  comerciante   Comerciante @relation(fields: [idComerciante], references: [id])
+  idComerciante String
+
+  inspector     Usuario     @relation("UsuarioInspecciones", fields: [idInspector], references: [id])
+  idInspector   String
+}
+
+model Reporte {
+  id              String               @id @default(uuid())
+  tipo            String
+  rangoFechas     String?
+  formato         String?              // "PDF" | "Excel" | "CSV"
+  fechaGeneracion DateTime             @default(now())
+
+  autor           Usuario              @relation("UsuarioReportes", fields: [idAutor], references: [id])
+  idAutor         String
+
+  comerciantes    ReporteComerciante[]
+  creadoEn        DateTime             @default(now())
+}
+
+model ReporteComerciante {
+  idReporte     String
+  idComerciante String
+
+  reporte       Reporte     @relation(fields: [idReporte], references: [id])
+  comerciante   Comerciante @relation(fields: [idComerciante], references: [id])
+
+  @@id([idReporte, idComerciante])
+}
+
+model Auditoria {
+  id        String   @id @default(uuid())
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
+  usuarioId String?
+  accion    String   // "alta" | "baja" | "modificacion" | "login" | "reporte"
+  modulo    String   // "comerciante" | "inspeccion" | "reporte" | "usuario"
+  fechaHora DateTime @default(now())
+  detalle   String?
+}
+
+```
 
 ---
 
 ## 4. Scripts de migración en `package.json`
 
-Asegúrate de tener:
-
 ```json
-"scripts": {
-  "dev": "next dev",
-  "build": "next build",
-  "start": "next start",
-  "lint": "next lint",
-  "prisma:generate": "prisma generate",
-  "prisma:migrate:dev": "prisma migrate dev",
-  "prisma:migrate:create": "prisma migrate dev --create-only",
-  "prisma:migrate:deploy": "prisma migrate deploy",
-  "prisma:studio": "prisma studio",
-  "db:seed": "ts-node --transpile-only prisma/seed.ts"
-},
-"prisma": {
-  "seed": "ts-node --transpile-only prisma/seed.ts"
+{
+  "name": "sigecovip",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "preview": "next build && next start",
+
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:create": "prisma migrate dev --create-only",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "db:seed": "ts-node --transpile-only prisma/seed.ts",
+
+    "lint": "next lint",
+    "lint:fix": "next lint --fix",
+    "typecheck": "tsc --noEmit",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
+    "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
+
+    "check": "next lint && tsc --noEmit",
+
+    "postinstall": "prisma generate"
+  },
+  "prisma": {
+    "seed": "ts-node --transpile-only prisma/seed.ts"
+  },
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.7.2",
+    "@prisma/client": "^6.5.0",
+    "@t3-oss/env-nextjs": "^0.12.0",
+    "@tanstack/react-query": "^5.69.0",
+    "@trpc/client": "^11.0.0",
+    "@trpc/react-query": "^11.0.0",
+    "@trpc/server": "^11.0.0",
+    "next": "^15.2.3",
+    "next-auth": "5.0.0-beta.25",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1",
+    "superjson": "^2.2.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@tailwindcss/postcss": "^4.0.15",
+    "@types/node": "^20.14.10",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.23.0",
+    "eslint-config-next": "^15.2.3",
+    "postcss": "^8.5.3",
+    "prettier": "^3.5.3",
+    "prettier-plugin-tailwindcss": "^0.6.11",
+    "prisma": "^6.5.0",
+    "tailwindcss": "^4.0.15",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.27.0"
+  },
+  "ct3aMetadata": {
+    "initVersion": "7.39.3"
+  },
+  "packageManager": "pnpm@10.15.1"
 }
 ```
 
