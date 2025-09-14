@@ -29,7 +29,7 @@ Selección:
 
 ---
 
-## 2. Base de datos en Docker
+## 2. Base de datos en Docker (opcional, solo para testear)
 
 Levantaste un contenedor PostgreSQL 16:
 
