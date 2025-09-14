@@ -1,74 +1,69 @@
-# Fase 0 — Preparación del entorno en Windows 10 Home (técnico/profesional)
-
-> Objetivo: dejar el equipo listo para desarrollar SIGECOVIP con **Create-T3-App (Next.js + TypeScript + tRPC + Prisma + Tailwind)**, **PostgreSQL en Docker**, e integraciones modulares (Mapbox/Firebase) bajo el enfoque **Opción C (híbrida)** que ya definiste en tus documentos.
-
----
+# Fase 0 — Preparación del entorno en Windows 10 Home (versión mejorada)
 
 ## 0.1 Requisitos del sistema
 
-* **Windows 10 Home** actualizado (20H2+ recomendado).
-* CPU con **virtualización** habilitada (Intel VT-x/AMD-V) en BIOS/UEFI.
-* 16 GB RAM (mínimo 8 GB), 30+ GB libres en disco.
-* Conectividad de red sin bloqueo a `registry.npmjs.org` y `ghcr.io`.
+* **Windows 10 Home** actualizado (20H2+).
+* CPU con **virtualización** (Intel VT-x/AMD-V) habilitada en BIOS/UEFI.
+* **RAM**: 16 GB recomendados (mínimo 8 GB). **Disco**: ≥30 GB libres.
+* Red sin bloqueo hacia `registry.npmjs.org` y contenedores (Docker Hub/GHCR).
 
-> En el Manual Técnico registra: versión de Windows, CPU, RAM, disco y confirmación de virtualización.
+> Registra en el Manual: versión de Windows, CPU, RAM, disco y confirmación de virtualización.
 
 ---
 
-## 0.2 PowerShell y política de ejecución
+## 0.2 PowerShell y política de ejecución (evitar bloqueos)
 
-Para evitar bloqueos al usar herramientas **pnpm/npx** en PS:
+* Si PowerShell bloquea scripts (`*.ps1`), tienes tres caminos:
 
-* Opción segura (por sesión):
+  1. **Usar los wrappers `.cmd`** (recomendado en tu caso): `npm.cmd`, `pnpm.cmd`, `npx.cmd`.
+  2. Permitir scripts para tu usuario:
 
-  ```powershell
-  Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-  ```
-* Opción persistente (recomendada para tu usuario):
+     ```powershell
+     Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+     ```
+  3. Solo para la sesión actual:
 
-  ```powershell
-  Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-  ```
+     ```powershell
+     Set-ExecutionPolicy -Scope Process Bypass
+     ```
 
-> Nota: Siempre puedes invocar **`pnpm.cmd`** para saltar restricciones si fuese necesario.
+> Con esto evitas el error de “la ejecución de scripts está deshabilitada”.
 
 ---
 
 ## 0.3 Node.js + Corepack (pnpm)
 
-1. **Instala Node.js LTS** (o superior).
-2. **Habilita Corepack** y activa pnpm:
+1. Instala **Node.js LTS** (incluye `npm` y **Corepack**).
+2. Habilita **pnpm** con Corepack:
 
    ```powershell
    corepack enable
    corepack prepare pnpm@latest --activate
+   ```
+3. Verificaciones (usa `.cmd` donde aplique):
+
+   ```powershell
+   node -v
+   npm.cmd -v
+   corepack --version
    pnpm.cmd -v
    ```
 
-   Si quieres usar `pnpm` (sin `.cmd`), asegúrate de haber aplicado 0.2.
-
-**Comprobaciones**
-
-```powershell
-node -v
-npm -v
-corepack --version
-pnpm.cmd -v
-```
+> Si `pnpm` sin `.cmd` falla, sigue usando `pnpm.cmd` o aplica 0.2.
 
 ---
 
 ## 0.4 Git y GitHub CLI
 
-1. **Instala Git** (habilita “Git from command line”).
-2. Configura identidad global:
+1. Instala **Git** (marca “Git from command line”).
+2. Configura identidad:
 
    ```powershell
    git config --global user.name  "Tu Nombre"
    git config --global user.email "tu@email"
    git config --global init.defaultBranch main
    ```
-3. **GitHub CLI (opcional, recomendado)**:
+3. (Opcional) **GitHub CLI**:
 
    ```powershell
    gh --version
@@ -77,24 +72,26 @@ pnpm.cmd -v
 
 ---
 
-## 0.5 VS Code y extensiones
+## 0.5 VS Code y extensiones (mínimo viable)
 
 * **VS Code** actualizado.
-* Extensiones mínimas:
+* Extensiones: **ESLint**, **Prettier**, **Prisma**, **Tailwind CSS IntelliSense**, **Docker**, **GitHub Actions**.
+* Ajustes sugeridos (`.vscode/settings.json`):
 
-  * **ESLint**, **Prettier**, **Prisma**, **Tailwind CSS IntelliSense**, **Docker**, **GitHub Actions**.
-* Ajustes recomendados (`.vscode/settings.json` del repo más adelante):
-
-  * `"editor.formatOnSave": true`
-  * `"eslint.validate": ["typescript","typescriptreact","javascript"]`
+  ```json
+  {
+    "editor.formatOnSave": true,
+    "eslint.validate": ["typescript", "typescriptreact", "javascript"]
+  }
+  ```
 
 ---
 
 ## 0.6 WSL2 y Docker Desktop (imprescindible en Win10 Home)
 
-### 0.6.1 Activar características de Windows
+### 0.6.1 Activar características
 
-Ejecuta PowerShell **Administrador**:
+Ejecuta PowerShell **como Administrador**:
 
 ```powershell
 dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
@@ -103,68 +100,85 @@ dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /nores
 
 Reinicia.
 
-### 0.6.2 Instalar distribución WSL y configurar WSL2
+### 0.6.2 Instalar/actualizar WSL
 
-```powershell
-wsl --install -d Ubuntu
-wsl --set-default-version 2
-wsl --status
-```
+* Instala distro (si no la tienes):
 
-### 0.6.3 Instalar y configurar Docker Desktop
+  ```powershell
+  wsl --install -d Ubuntu
+  ```
+* Como te pidió Docker, **actualiza el kernel**:
 
-* En **Settings → General**: activa **“Use the WSL 2 based engine”**.
-* En **Resources → WSL Integration**: habilita tu distro (Ubuntu).
-* En **Resources → Advanced**: reserva **CPU/RAM** (ej. 4 vCPU / 6-8 GB) para cargas con Postgres, Prisma y el frontend.
+  ```powershell
+  wsl --update
+  wsl --set-default-version 2
+  wsl --status
+  ```
 
-**Pruebas rápidas Docker**
+### 0.6.3 Instalar y configurar Docker Desktop (descarga oficial)
+
+* **General**: activa **“Use the WSL 2 based engine”**.
+* **Resources → WSL Integration**: habilita **Ubuntu**.
+* **Resources → Advanced**: asigna **4 vCPU** y **6–8 GB RAM** para un flujo cómodo (Next.js + Prisma + Postgres).
+
+**Smoke test Docker**
 
 ```powershell
 docker version
 docker info
 docker run --rm hello-world
+```
+
+---
+
+## 0.7 PostgreSQL en contenedor: fijar versión (importante)
+
+* `docker pull postgres` **descarga la última estable** (actualmente suele ser **17**).
+* Para **evitar incompatibilidades** entre entornos y CI/CD, **fija versión** explícita. Recomendamos **PostgreSQL 16** por estabilidad y amplia cobertura en proveedores y tooling.
+
+**Descarga la imagen recomendada:**
+
+```powershell
 docker pull postgres:16
 ```
 
-> Tu arquitectura (Docker + PostgreSQL) está alineada al diseño y RNF de compatibilidad y escalabilidad definidos.
+> Si prefieres 17, cámbialo a `postgres:17` en **todos** tus archivos (local, CI/CD). Lo clave es **no usar `latest`** y ser consistente.
 
 ---
 
-## 0.7 Utilidades opcionales (recomendadas)
+## 0.8 Utilidades opcionales
 
-* **7-Zip** o **PeaZip** (manejo de backups/exports).
-* **mkcert** (TLS local, si pruebas HTTPS).
-* **PostgreSQL client** (`psql`) dentro de WSL o contenedor:
+* **psql** (cliente Postgres) en WSL:
 
   ```bash
-  # en Ubuntu (WSL)
   sudo apt update && sudo apt install -y postgresql-client
   psql --version
   ```
+* **mkcert** (TLS local), **7-Zip/PeaZip** (backups/exports).
 
 ---
 
-## 0.8 Validaciones finales (checklist)
+## 0.9 Validaciones finales (checklist)
 
-* [ ] `node -v`, `npm -v`, `pnpm.cmd -v`, `corepack --version` OK.
-* [ ] PS con ExecutionPolicy ajustada (o decidido usar `pnpm.cmd`).
-* [ ] Docker Desktop operativo con WSL2 engine; `docker run hello-world` OK.
-* [ ] Imagen `postgres:16` descargada.
-* [ ] VS Code con extensiones instaladas.
-* [ ] Git configurado (`git config --global --list`).
-* [ ] (Opcional) `gh auth login` realizado.
-
-> **Registro en Manual Técnico** (sección “Requisitos del entorno”): versiones instaladas, política de ejecución adoptada, capturas de `docker info` y `pnpm.cmd -v`, y observaciones de red/seguridad. Esta sección conecta con el stack y compatibilidad documentados en ERS/Manual.
+* [ ] `node -v`, `npm.cmd -v`, `pnpm.cmd -v`, `corepack --version` OK.
+* [ ] **ExecutionPolicy** resuelto o decidido usar `.cmd`.
+* [ ] **WSL** actualizado: `wsl --update` ejecutado, **WSL2** por defecto.
+* [ ] **Docker Desktop** con engine WSL2 y **hello-world** OK.
+* [ ] Imagen Postgres **fijada**: `docker pull postgres:16` descargada.
+* [ ] VS Code con extensiones clave.
+* [ ] Git configurado; (opcional) `gh auth login` completado.
 
 ---
 
-## 0.9 Notas operativas (riesgos tempranos)
+### Notas y buenas prácticas
 
-* **Antivirus/Firewall corporativo**: puede interferir con `registry.npmjs.org` o sockets Docker. Documenta exclusiones si aplica.
-* **Espacio en disco**: Docker y volúmenes de Postgres crecen; planifica limpieza con `docker system prune` (con cuidado).
-* **Telemetría/privacidad**: registra en el Manual cómo se resguardarán `.env` y secretos (se usan en fases siguientes).
+* **Version pinning**: fija versiones en imágenes (`postgres:16`), Node (LTS), y en CI (Actions) para reproducibilidad.
+* **Red corporativa/antivirus**: si bloquea TLS/registro npm, documenta excepciones.
+* **Espacio Docker**: limpia periódicamente (`docker system prune`) con cautela (verifica qué eliminarás).
+* **Secretos**: prepara desde ahora un `.env.example` (sin credenciales) y define cómo manejarás secretos en CI/Cloud.
 
 ---
+
 # Fase 1 — Creación del proyecto con Create-T3-App (ajustada a tus respuestas y a PowerShell)
 
 > Contexto Windows 10 Home: en **PowerShell** la ejecución de scripts puede estar restringida; por eso usa **`pnpm.cmd`** (no `pnpm`) para evitar el bloqueo de `*.ps1`.
