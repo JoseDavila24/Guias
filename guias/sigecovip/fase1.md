@@ -34,16 +34,42 @@ Selecciona exactamente:
 Crea un archivo `.env` en la raíz:
 
 ```dotenv
-DATABASE_URL="postgresql://sigeco:sigeco_pass@localhost:5432/sigecovip?schema=public"
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="dev-secret-change-me"
-JWT_SIGNING_KEY="dev-jwt-secret-change-me"
+# ===========================================
+# NextAuth Configuración base
+# ===========================================
 
-# Tokens externos (se añadirán más adelante)
+# Secret para NextAuth. El que crea T3 es válido, pero puedes regenerarlo:
+# npx auth secret
+AUTH_SECRET="Iu944Zhi/YJhGUyPtUbWk5ktu2sEEe+wu1LuFUrAyX0="
+
+# URL base de la aplicación
+NEXTAUTH_URL="http://localhost:3000"
+
+# Solo necesitas UNO de los dos (mantén coherencia):
+# - AUTH_SECRET (el recomendado con T3 moderno)
+# - NEXTAUTH_SECRET (legacy). Puedes eliminarlo si ya usas AUTH_SECRET.
+#NEXTAUTH_SECRET="dev-secret-change-me"
+
+# ===========================================
+# Proveedores externos (vacíos por ahora)
+# ===========================================
+# Ejemplo con Discord (no se usará en SIGECOVIP, puedes dejarlo vacío o eliminarlo)
+AUTH_DISCORD_ID=""
+AUTH_DISCORD_SECRET=""
+
+# Tokens que sí usarás en SIGECOVIP
 NEXT_PUBLIC_MAPBOX_TOKEN=
 FIREBASE_ADMIN_PROJECT_ID=
 FIREBASE_ADMIN_CLIENT_EMAIL=
 FIREBASE_ADMIN_PRIVATE_KEY=""
+
+# ===========================================
+# Prisma / Base de datos
+# ===========================================
+
+# URL de conexión a PostgreSQL en Docker
+# NOTA: Ya incluye usuario `sigeco`, contraseña `sigeco_pass` y el schema `public`
+DATABASE_URL="postgresql://sigeco:sigeco_pass@localhost:5432/sigecovip?schema=public"
 ```
 
 > Desde esta fase se prepara la compatibilidad con **Mapbox** y **Firebase/Auth**, como se definió en el EVS y el diseño.
