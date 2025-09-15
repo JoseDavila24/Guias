@@ -498,20 +498,220 @@ model Auditoria {
 
 ## 5. Scripts de migración (`package.json`)
 
-📌 *Aquí va el bloque de scripts (`prisma:generate`, `prisma:migrate:dev`, `prisma:migrate:deploy`, etc.).*
+**Objetivo:** estandarizar comandos para **generar cliente**, **versionar cambios de esquema**, **aplicar migraciones** en dev/prod y **sembrar datos mínimos**. Los scripts deben funcionar en Windows (usa `pnpm.cmd`/`npm.cmd` si invocas desde PowerShell).
 
-> **Nota importante:**
+### 5.1 Bloque de scripts en `package.json`
+
+**(Pega aquí tu bloque real de `scripts`)**
+Incluye, al menos, estos alias:
+
+* `prisma:generate` → generar Prisma Client
+* `prisma:migrate:dev` → crear **y aplicar** migración en desarrollo
+* `prisma:migrate:create` → crear migración **sin** aplicarla (revisión previa)
+* `prisma:migrate:deploy` → aplicar migraciones **sin preguntas** (para CI/CD / producción)
+* `prisma:studio` → inspección visual
+* `db:seed` → ejecutar el seed (TS/JS)
+* (opcional) `check`, `typecheck`, `lint`, `format:*`
+
+```
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "preview": "next build && next start",
+
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:create": "prisma migrate dev --create-only",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "db:seed": "ts-node --transpile-only prisma/seed.ts",
+
+    "lint": "next lint",
+    "lint:fix": "next lint --fix",
+    "typecheck": "tsc --noEmit",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
+    "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
+
+    "check": "next lint && tsc --noEmit",
+
+    "postinstall": "prisma generate"
+  },
+  "prisma": {
+    "seed": "ts-node --transpile-only prisma/seed.ts"
+  },
+```
+
+> Sugerencia típica:
 >
-> * Se eliminan referencias a *“bases de prueba”*.
-> * La primera migración (`init`) se ejecuta sobre la base real (`sigecovip`) que seguirá viva y versionada hasta el despliegue cloud.
+> * `"prisma:generate": "prisma generate"`
+> * `"prisma:migrate:dev": "prisma migrate dev"`
+> * `"prisma:migrate:create": "prisma migrate dev --create-only"`
+> * `"prisma:migrate:deploy": "prisma migrate deploy"`
+> * `"prisma:studio": "prisma studio"`
+> * `"db:seed": "ts-node --transpile-only prisma/seed.ts"`
+> * `"postinstall": "prisma generate"`
+
+### 5.2 Wiring del **seed** (Prisma)
+
+**(Pega aquí la propiedad “prisma.seed” de tu `package.json`)**
+Define cómo invocar tu script de seed:
+
+```
+/* ---------------  AQUI TU CODIGO: package.json -> "prisma": { "seed": ... }  --------------- */
+```
+
+> Ejemplo común (TypeScript):
+>
+> * `"prisma": { "seed": "ts-node --transpile-only prisma/seed.ts" }`
+> * Estructura mínima del seed: crea **1 usuario coordinador** y **1 comerciante** (y opcional 1 inspección) para validar relaciones.
+
+### 5.3 Flujos de trabajo recomendados
+
+**Primer arranque (local dev):**
+
+1. `pnpm prisma:generate`
+2. `pnpm prisma:migrate:dev --name init`
+3. `pnpm db:seed` *(opcional, recomendable)*
+
+**Cambio del modelo (nuevo campo/tabla):**
+
+1. Edita `schema.prisma`
+2. `pnpm prisma:migrate:create --name <cambio>` *(revisa SQL generado)*
+3. `pnpm prisma:migrate:dev` *(aplica en dev + actualiza Prisma Client)*
+
+**Despliegue / CI-CD (ambientes no interactivos):**
+
+1. `pnpm prisma:generate`
+2. `pnpm prisma:migrate:deploy` *(aplica todas las migraciones pendientes, sin prompt)*
+3. `pnpm db:seed` *(si procede en el entorno; a veces solo en staging)*
+
+> Nota: en **producción** muchas veces **no** se ejecuta `db:seed` automáticamente (evita datos demo).
+
+### 5.4 Compatibilidad Windows (PowerShell)
+
+* Si ves errores tipo “comando no reconocido”, usa **wrappers `.cmd`**: `pnpm.cmd prisma ...`, `npm.cmd run ...`.
+* Mantén `Set-ExecutionPolicy` como definiste en Fase 0 para evitar bloqueos de scripts.
+
+### 5.5 Compose vs host (resolución de `DATABASE_URL`)
+
+* **App en host / DB en Docker Compose**: host `localhost:5432`.
+* **App y DB dentro del mismo Compose**: host `postgres:5432` (nombre del servicio).
+* Mantén **un solo esquema real**; la migración corre sobre la base **productiva local** (la misma que escalará a cloud).
+
+### 5.6 Integración con CI/CD (plantilla mínima)
+
+En tu pipeline (GitHub Actions, etc.) ejecuta, en orden:
+
+1. Instalar deps → `pnpm install`
+2. Generar Prisma → `pnpm prisma:generate`
+3. Aplicar migraciones → `pnpm prisma:migrate:deploy`
+4. (Opcional) Seed controlado → `pnpm db:seed`
+5. Build y arranque de la app
+
+> Recuerda inyectar `DATABASE_URL` y secretos desde el **secret manager** del proveedor.
+
+### 5.7 Verificaciones rápidas
+
+* **Cliente Prisma generado** (evita errores de import): `node_modules/@prisma/client` presente.
+* **Migraciones versionadas**: carpeta `prisma/migrations/**_init/` y subsiguientes.
+* **Estado DB consistente**: `docker compose exec postgres psql -U <usuario> -d <db> -c "\dt"` muestra tus tablas.
+* **Prisma Studio** accesible para inspección rápida: `pnpm prisma:studio`.
 
 ---
 
 ## 6. Migración inicial
 
-* Ejecutar migración inicial (`prisma migrate dev --name init`).
-* Confirmar que se creó la carpeta `prisma/migrations/..._init/`.
-* El esquema de base de datos ya es el productivo (Docker local = réplica inicial de cloud).
+**Objetivo:** crear y aplicar la **primera migración definitiva** (`init`) sobre la base **productiva local** (PostgreSQL 16 en `docker-compose`). Esta migración versiona el esquema completo definido en `schema.prisma` y será la misma que se desplegará en la nube.
+
+### 6.1 Preparación
+
+1. **Base levantada** con `docker-compose` y saludable.
+2. `.env` apuntando a la DB productiva local (**misma forma** que usarás en cloud, solo cambiará host/credenciales).
+3. `schema.prisma` listo (sección 4 aplicada).
+
+> **Tip:** si tu app corre en host y la DB en compose, usa `localhost`; si corre todo en compose, usa `postgres` como host (nombre del servicio).
+
+### 6.2 Crear y aplicar la migración `init`
+
+**(Pega aquí tus comandos exactos de PNPM/NPM)**
+
+```
+# AQUÍ TU CÓDIGO:
+# 1) Generar cliente Prisma
+# pnpm prisma generate
+
+# 2) Crear y aplicar la migración inicial sobre la base productiva local
+# pnpm prisma migrate dev --name init
+```
+
+**Resultados esperados:**
+
+* Carpeta `prisma/migrations/<timestamp>_init/` creada con SQL versionado.
+* Prisma Client actualizado.
+
+### 6.3 Verificación post–migración
+
+**(Pega aquí tus comandos de verificación preferidos)**
+
+```
+# AQUÍ TU CÓDIGO:
+# Ver tablas desde el contenedor
+# docker compose exec postgres psql -U <usuario> -d <db> -c "\dt"
+
+# Opcional: abrir Prisma Studio
+# pnpm prisma studio
+```
+
+**Debes ver:** tablas de `Usuario`, `Comerciante`, `Inspeccion`, `Reporte`, `ReporteComerciante`, `Auditoria` (y sus índices/relaciones).
+
+### 6.4 Problemas comunes y soluciones rápidas
+
+* **Error de conexión** (ECONNREFUSED / timeouts):
+
+  * Verifica `docker compose ps` (servicio `postgres` en `Up`) y `DATABASE_URL`.
+  * Si estás dentro de compose, host debe ser `postgres`, no `localhost`.
+
+* **Migración ya aplicada / estado inconsistente**:
+
+  * Usa `pnpm prisma migrate resolve --applied <nombremigracion>` si necesitas marcarla como aplicada (manejar con cuidado).
+  * Evita borrar la carpeta `migrations` si la DB ya tiene cambios aplicados.
+
+* **Conflicto por cambios manuales en DB**:
+
+  * Reconciliar el esquema: refleja cambios en `schema.prisma` y crea una nueva migración; no edites la DB manualmente.
+
+### 6.5 Qué queda versionado
+
+* SQL de **creación de tablas/índices/constraints** en `prisma/migrations/**`.
+* `schema.prisma` y el **historial** de migraciones, base para reproducir el esquema en cualquier entorno (staging/prod/cloud).
+
+### 6.6 Política de cambios (a futuro)
+
+1. Edita `schema.prisma`.
+2. Crea migración **sin aplicar** para revisión:
+   **(Pega aquí tu comando)**
+
+   ```
+   # AQUÍ TU CÓDIGO:
+   # pnpm prisma migrate dev --create-only --name <cambio>
+   ```
+3. Revisa el SQL generado (opcional).
+4. **Aplica** en desarrollo:
+   **(Pega aquí tu comando)**
+
+   ```
+   # AQUÍ TU CÓDIGO:
+   # pnpm prisma migrate dev
+   ```
+5. En CI/CD / producción: `pnpm prisma migrate deploy`.
+
+### 6.7 Estado al finalizar la sección
+
+* Migración `init` **creada y aplicada** sobre la base productiva local.
+* Prisma Client generado y funcional.
+* Tablas visibles y consistentes.
+* Proyecto listo para continuar con **seed mínimo** y **smoke test**.
 
 ---
 
