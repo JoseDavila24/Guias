@@ -288,19 +288,211 @@ Incluye **todas** las variables esperadas por el proyecto, pero en blanco o con 
 * `DATABASE_URL` apuntando a la **base productiva local** de `docker-compose`.
 * Proyecto listo para ejecutar migraciones y luego **migrar a cloud** cambiando solo credenciales/host.
 
-
 ---
 
 ## 4. Modelo de datos (Prisma)
 
-📌 *Aquí pegas el bloque de código del `schema.prisma` con todas las entidades (`Usuario`, `Comerciante`, `Inspección`, `Reporte`, `Auditoría`).*
+**Objetivo:** definir el **modelo productivo** desde el día 1 (no temporal) para soportar las entidades y relaciones nucleares del sistema: `Usuario`, `Comerciante`, `Inspeccion`, `Reporte`, `ReporteComerciante` (N\:M) y `Auditoria`.
+El esquema se versionará con **migraciones Prisma** y será portable a nube cambiando únicamente la `DATABASE_URL`.
 
-✅ Este modelo corresponde directamente a los requisitos del ERS:
+### 4.1 Principios de modelado (acuerdos)
 
-* RF-02 (CRUD Comerciantes) → `Comerciante`.
-* RF-06 (Inspecciones) → `Inspección`.
-* RF-07 (Reportes) → `Reporte` y `ReporteComerciante`.
-* RF-08 (Auditoría) → `Auditoría`.
+* **Identificadores:** `UUID` (STRING en Prisma con `@default(uuid())`).
+* **Trazabilidad:** timestamps `creadoEn` (`@default(now())`) y `actualizadoEn` (`@updatedAt`) donde aplique.
+* **Integridad referencial:**
+
+  * `Inspeccion` referencia a `Comerciante` (1\:N) y a `Usuario` (inspector).
+  * `Reporte` referencia a `Usuario` (autor).
+  * `ReporteComerciante` resuelve la N\:M entre `Reporte` y `Comerciante` con **PK compuesta**.
+* **Dominios (enums):** `RolUsuario { INSPECTOR, COORDINADOR }`, `EstatusOperativo { VIGENTE, IRREGULAR, SANCIONADO, EN_TRAMITE }`.
+* **Índices y unicidad:** `Usuario.email` único; índices por campos de consulta frecuentes (p. ej. `Comerciante.organizacion`, `Comerciante.estatus`).
+* **Seguridad:** las contraseñas se guardan **hasheadas** (bcrypt/argon2) —se implementa en la capa de servicio/Auth.
+* **Escalabilidad:** tipos numéricos adecuados para lat/lon (`Decimal(9,6)`), superficies (`Decimal(10,2)`), y campos `String` para notas/documentos (URLs).
+
+### 4.2 `schema.prisma` (pega aquí tu código)
+
+> **Inserta aquí el contenido real de tu `prisma/schema.prisma`** con:
+>
+> * `datasource db` → `provider = "postgresql"` y `url = env("DATABASE_URL")`
+> * `generator client` → `prisma-client-js`
+> * Enums: `RolUsuario`, `EstatusOperativo`
+> * Modelos: `Usuario`, `Comerciante`, `Inspeccion`, `Reporte`, `ReporteComerciante`, `Auditoria`
+> * Relaciones e índices (ver 4.3)
+
+```
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RolUsuario {
+  INSPECTOR
+  COORDINADOR
+}
+
+enum EstatusOperativo {
+  VIGENTE
+  IRREGULAR
+  SANCIONADO
+  EN_TRAMITE
+}
+
+model Usuario {
+  id            String    @id @default(uuid())
+  nombre        String
+  email         String    @unique
+  hashPassword  String
+  rol           RolUsuario
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+
+  inspecciones  Inspeccion[] @relation("UsuarioInspecciones")
+  reportes      Reporte[]    @relation("UsuarioReportes")
+  auditorias    Auditoria[]
+}
+
+model Comerciante {
+  id               String    @id @default(uuid())
+  titularNombre    String
+  giro             String
+  superficieM2     Decimal?  @db.Decimal(10, 2)
+  diasOperacion    String?
+  horarioOperacion String?
+  tipoMontaje      String?
+  licenciaPermiso  String?
+  direccion        String?
+  latitud          Decimal?  @db.Decimal(9, 6)
+  longitud         Decimal?  @db.Decimal(9, 6)
+  organizacion     String?
+  estatus          EstatusOperativo
+  creadoEn         DateTime  @default(now())
+  actualizadoEn    DateTime  @updatedAt
+
+  inspecciones     Inspeccion[]
+  reportes         ReporteComerciante[] // N:M con Reporte
+}
+
+model Inspeccion {
+  id            String      @id @default(uuid())
+  fechaHora     DateTime    @default(now())
+  notas         String?
+  evidenciasUrl String?
+
+  comerciante   Comerciante @relation(fields: [idComerciante], references: [id])
+  idComerciante String
+
+  inspector     Usuario     @relation("UsuarioInspecciones", fields: [idInspector], references: [id])
+  idInspector   String
+}
+
+model Reporte {
+  id              String               @id @default(uuid())
+  tipo            String
+  rangoFechas     String?
+  formato         String?              // "PDF" | "Excel" | "CSV"
+  fechaGeneracion DateTime             @default(now())
+
+  autor           Usuario              @relation("UsuarioReportes", fields: [idAutor], references: [id])
+  idAutor         String
+
+  comerciantes    ReporteComerciante[]
+  creadoEn        DateTime             @default(now())
+}
+
+model ReporteComerciante {
+  idReporte     String
+  idComerciante String
+
+  reporte       Reporte     @relation(fields: [idReporte], references: [id])
+  comerciante   Comerciante @relation(fields: [idComerciante], references: [id])
+
+  @@id([idReporte, idComerciante])
+}
+
+model Auditoria {
+  id        String   @id @default(uuid())
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
+  usuarioId String?
+  accion    String   // "alta" | "baja" | "modificacion" | "login" | "reporte"
+  modulo    String   // "comerciante" | "inspeccion" | "reporte" | "usuario"
+  fechaHora DateTime @default(now())
+  detalle   String?
+}
+```
+
+### 4.3 Convenciones y restricciones (guía para tu `schema.prisma`)
+
+* **Usuario**
+
+  * `email String @unique`
+  * `rol RolUsuario`
+  * Relaciones: `inspecciones`, `reportes`, `auditorias`
+* **Comerciante**
+
+  * Atributos clave: `titularNombre`, `giro`, `superficieM2 Decimal(10,2)?`, `diasOperacion?`, `horarioOperacion?`, `tipoMontaje?`, `licenciaPermiso?`, `direccion?`, `latitud Decimal(9,6)?`, `longitud Decimal(9,6)?`, `organizacion?`, `estatus EstatusOperativo`
+  * Índices sugeridos:
+
+    * `@@index([organizacion])`
+    * `@@index([estatus])`
+    * `@@index([latitud, longitud])` (para filtros geográficos simples)
+* **Inspeccion**
+
+  * Claves foráneas: `idComerciante` → `Comerciante.id`, `idInspector` → `Usuario.id`
+  * Atributos: `fechaHora @default(now())`, `notas?`, `evidenciasUrl?`
+  * Índices sugeridos: `@@index([idComerciante, fechaHora])`
+* **Reporte**
+
+  * Autor: `idAutor` → `Usuario.id`
+  * `tipo`, `rangoFechas?`, `formato?` ("PDF" | "Excel" | "CSV"), `fechaGeneracion @default(now())`
+* **ReporteComerciante**
+
+  * PK compuesta: `@@id([idReporte, idComerciante])`
+* **Auditoria**
+
+  * FK opcional a `Usuario` (`usuarioId?`)
+  * Campos: `accion` ("alta" | "baja" | "modificacion" | "login" | "reporte"), `modulo` ("comerciante" | "inspeccion" | "reporte" | "usuario"), `fechaHora @default(now())`, `detalle?`
+  * Índice sugerido: `@@index([modulo, fechaHora])`
+
+> **Notas opcionales (si te sirven a futuro):**
+>
+> * Si contemplas búsquedas por texto/organización frecuentes, podrías añadir índices adicionales.
+> * Para mapas avanzados, **PostGIS** sería futuro; hoy mantenemos lat/lon como `Decimal` y rendimiento con índices básicos.
+
+### 4.4 Migraciones definitivas
+
+* La **primera migración** (`init`) se aplica ya sobre la **base productiva local** (tu `docker-compose`), no sobre una DB “temporal”.
+* Cada cambio al modelo se versiona con `prisma migrate dev --name <cambio>` en desarrollo y luego `migrate deploy` en ambientes no interactivos (CI/CD).
+
+### 4.5 Trazabilidad RF/RNF ↔ entidades/atributos (mini–tabla)
+
+| Requisito                     | Entidad/atributo relacionado                           | Notas                                                 |
+| ----------------------------- | ------------------------------------------------------ | ----------------------------------------------------- |
+| **RF-01** Autenticación/roles | `Usuario.email`, `Usuario.hashPassword`, `Usuario.rol` | Roles `INSPECTOR/COORDINADOR`; hash en lógica de auth |
+| **RF-02** CRUD Comerciantes   | `Comerciante.*`                                        | Incluye georreferenciación, organización, estatus     |
+| **RF-03** Mapa y filtros      | `Comerciante.latitud/longitud`, índices                | Índices por `organizacion` y `estatus` para filtros   |
+| **RF-04** Ficha técnica       | `Comerciante.*`, relaciones `Inspeccion`               | Debe incluir historial de inspecciones                |
+| **RF-05** Vista tabular       | Índices en `Comerciante`                               | Optimiza búsqueda/ordenación/exportación              |
+| **RF-06** Inspecciones        | `Inspeccion` + FKs a `Comerciante`/`Usuario`           | Fecha, notas, evidencias (URL)                        |
+| **RF-07** Reportes            | `Reporte`, `ReporteComerciante` (N\:M)                 | Autor (`Usuario`), rango y formato                    |
+| **RF-08** Auditoría           | `Auditoria` (+ FK opcional a `Usuario`)                | Acción, módulo, fecha, detalle                        |
+| **RNF-02** Escalabilidad      | Índices y tipos adecuados                              | ≥ 1,000 comerciantes; lat/lon como `Decimal`          |
+| **RNF-04** Seguridad          | `Usuario.hashPassword` (bcrypt/argon2)                 | TLS y roles fuera del modelo (infra/app)              |
+
+### 4.6 Validación rápida del modelo
+
+1. **Generar cliente:** `pnpm prisma generate`
+2. **Crear/aplicar migración inicial:** `pnpm prisma migrate dev --name init`
+3. **(Opcional) Seed mínimo:** insertar 1 `Usuario` (COORDINADOR) + 1 `Comerciante` + 1 `Inspeccion` para validar relaciones.
+4. **Prisma Studio (opcional):** `pnpm prisma studio` para ver tablas/relaciones.
+
+### 4.7 Consideraciones para la nube (portabilidad)
+
+* El **DDL** queda 1:1 en cualquier proveedor (Supabase, Railway, RDS, etc.) usando las mismas migraciones.
+* Al migrar: realiza **backup** (`pg_dump -Fc`) y **restore** (`pg_restore -c`) en el destino; luego **ajusta solo `DATABASE_URL`** y ejecuta `prisma migrate deploy`.
 
 ---
 
