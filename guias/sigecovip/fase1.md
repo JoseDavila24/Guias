@@ -154,17 +154,140 @@ Publica un `.env.example` (sin secretos) con las variables esperadas.
 * `.env` apuntando a esta base **productiva local**.
 * Comandos de **operación**, **listado/limpieza** y **backup/restore** documentados.
 
----
-
 ## 3. Variables de entorno
 
-* Archivo `.env` configurado con:
+**Principio:** Mantener **secretos fuera del repo**, publicar un **`.env.example`** completo (sin credenciales) y usar la **misma forma de `DATABASE_URL`** en todos los entornos para facilitar la migración a nube (cambiar solo host/credenciales).
 
-  * **NextAuth** (`AUTH_SECRET`, `NEXTAUTH_URL`).
-  * **Tokens externos** (Mapbox, Firebase/Auth, en blanco si no se usan aún).
-  * **DATABASE\_URL** con la conexión a PostgreSQL productivo (no de prueba).
+### 3.1 Convenciones y archivos
 
-* Se mantiene un `.env.example` sin credenciales, para cumplir RNF-04 (seguridad de datos).
+* **`.env` (local desarrollo):** Solo en tu máquina. No se versiona.
+* **`.env.example` (plantilla):** Se versiona (sin secretos). Debe reflejar **todas** las variables esperadas.
+* **`.env.production` / secretos en nube:** Se gestionan con el secret manager del proveedor (Vercel, Railway, Render, Supabase, AWS, etc.).
+* **`.gitignore`:** Asegúrate de ignorar `.env`, `.env.local`, llaves JSON, dumps y `/backups/`.
+
+### 3.2 `.env` (desarrollo local)
+
+Usa lo que ya tienes como base. Mantén **solo uno** entre `AUTH_SECRET` (moderno) y `NEXTAUTH_SECRET` (legacy). T3 moderno usa `AUTH_SECRET`.
+
+```
+# ===========================================
+# NextAuth Configuración base
+# ===========================================
+
+# Secret para NextAuth. El que crea T3 es válido, pero puedes regenerarlo:
+# npx auth secret
+AUTH_SECRET="Iu944Zhi/YJhGUyPtUbWk5ktu2sEEe+wu1LuFUrAyX0="
+
+# URL base de la aplicación
+NEXTAUTH_URL="http://localhost:3000"
+
+# Solo necesitas UNO de los dos (mantén coherencia):
+# - AUTH_SECRET (el recomendado con T3 moderno)
+# - NEXTAUTH_SECRET (legacy). Puedes eliminarlo si ya usas AUTH_SECRET.
+#NEXTAUTH_SECRET="dev-secret-change-me"
+
+# ===========================================
+# Proveedores externos (vacíos por ahora)
+# ===========================================
+# Ejemplo con Discord (no se usará en SIGECOVIP, puedes dejarlo vacío o eliminarlo)
+AUTH_DISCORD_ID="dummy"
+AUTH_DISCORD_SECRET="dummy"
+
+# Tokens que sí usarás en SIGECOVIP
+NEXT_PUBLIC_MAPBOX_TOKEN=
+FIREBASE_ADMIN_PROJECT_ID=
+FIREBASE_ADMIN_CLIENT_EMAIL=
+FIREBASE_ADMIN_PRIVATE_KEY=""
+
+# ===========================================
+# Prisma / Base de datos
+# ===========================================
+
+# URL de conexión a PostgreSQL en Docker
+# NOTA: Ya incluye usuario `sigeco`, contraseña `sigeco_pass` y el schema `public`
+DATABASE_URL="postgresql://sigeco:sigeco_pass@localhost:5432/sigecovip?schema=public"
+```
+
+**Notas sobre lo que ya traes:**
+
+* `AUTH_SECRET`: OK. Si cambias, genera uno nuevo con `npx auth secret`.
+* `NEXTAUTH_URL`: en local, `http://localhost:3000`. En producción, cámbialo a la URL pública.
+* Proveedores externos:
+
+  * `NEXT_PUBLIC_MAPBOX_TOKEN` → pública en frontend, pero **no** la subas en `.env.example` con valor real.
+  * `FIREBASE_ADMIN_*`: si usas la **llave privada** en variable, recuerda colocarla **entre comillas** y con saltos de línea escapados: `\n`. Alternativa más segura: usa credencial por **ruta de archivo** y variable `GOOGLE_APPLICATION_CREDENTIALS` apuntando a un JSON **fuera** del repo (o usa secret manager en producción).
+* `DATABASE_URL`: apunta a **tu base productiva local** del `docker-compose` (la que migrará a cloud). Ejemplo (lo que ya usas):
+
+  ```
+  postgresql://sigeco:sigeco_pass@localhost:5432/sigecovip?schema=public
+  ```
+
+> 💡 Si en el futuro corres **la app dentro de Docker** en la misma red de `compose`, el host cambia a `postgres` (nombre del servicio), no `localhost`.
+
+### 3.3 `.env.example` (plantilla sin secretos)
+
+Incluye **todas** las variables esperadas por el proyecto, pero en blanco o con placeholders. Así cualquier colaborador puede arrancar rápido.
+
+```
+# AQUÍ TU CÓDIGO: .env.example (placeholders, sin credenciales)
+```
+
+**Recomendación de contenido mínimo en `.env.example`:**
+
+* `AUTH_SECRET=`
+* `NEXTAUTH_URL=http://localhost:3000`
+* `NEXT_PUBLIC_MAPBOX_TOKEN=`
+* `FIREBASE_ADMIN_PROJECT_ID=`
+* `FIREBASE_ADMIN_CLIENT_EMAIL=`
+* `FIREBASE_ADMIN_PRIVATE_KEY=`  # (o usa GOOGLE\_APPLICATION\_CREDENTIALS)
+* `DATABASE_URL=postgresql://USER:PASS@HOST:5432/DB?schema=public`
+
+> Mantén este archivo **siempre sincronizado** con lo que realmente usa el proyecto.
+
+### 3.4 Notas específicas de NextAuth
+
+* Usa **solo `AUTH_SECRET`** (el moderno). Elimina comentarios/variables legacy si ya no se usan.
+* `NEXTAUTH_URL`:
+
+  * Local: `http://localhost:3000`
+  * Producción: URL pública (Vercel/tu dominio).
+* Si más adelante añades OAuth (Google, etc.), declara variables como `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` **solo** en secretos de prod.
+
+### 3.5 Prisma / `DATABASE_URL` (compatibilidad Docker y nube)
+
+* **Local (app en host + DB en Docker):** host `localhost`, puerto `5432`.
+* **App y DB dentro de `compose`:** host `postgres` (nombre del servicio en `docker-compose.yml`), mismo puerto `5432`.
+* **Nube:** cambia host, usuario y password según tu proveedor (no cambias el esquema ni las migraciones).
+
+```
+# AQUÍ TU CÓDIGO: si quieres pegar 2 variantes comentadas de DATABASE_URL (host localhost vs host postgres)
+```
+
+### 3.6 Validación rápida (pasos mínimos)
+
+1. `pnpm prisma generate`
+2. (Si aún no aplicaste) `pnpm prisma migrate dev --name init`
+3. `pnpm dev` → App en `http://localhost:3000`
+4. (Opcional) Verifica conexión:
+
+   ```
+   docker compose exec postgres psql -U sigeco -d sigecovip -c "\dt"
+   ```
+
+### 3.7 Buenas prácticas de seguridad
+
+* **Rotación** de `AUTH_SECRET` si se expone.
+* Jamás subir llaves ni `.env` al repo. Usa secret manager en producción.
+* Para llaves multilinea (Firebase), prefiere **archivo externo** y variable de ruta.
+* Mantén `.env.example` actualizado (onboarding del equipo y CI).
+
+### 3.8 Estado al terminar esta sección
+
+* `.env` local completo y funcional (no commiteado).
+* `.env.example` publicado y actualizado (sin secretos).
+* `DATABASE_URL` apuntando a la **base productiva local** de `docker-compose`.
+* Proyecto listo para ejecutar migraciones y luego **migrar a cloud** cambiando solo credenciales/host.
+
 
 ---
 
