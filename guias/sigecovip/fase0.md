@@ -3,9 +3,13 @@
 ## 0.1 Requisitos del sistema y políticas del SO
 
 * **Windows 10 Home 20H2+** actualizado.
+
 * CPU con **VT-x/AMD-V** habilitado en BIOS/UEFI.
+
 * **RAM**: 16 GB recomendados (mínimo 8 GB). **Disco**: ≥ 30 GB libres (mejor 50–80 GB si usarás imágenes Docker y datos).
+
 * **Red** con salida a `registry.npmjs.org` y registros de contenedores (Docker Hub/GHCR).
+
 * **Rutas largas** (evita errores en `node_modules`):
 
   ```powershell
@@ -13,12 +17,15 @@
   ```
 
   Y, si puedes, habilita “Enable Win32 long paths” en Windows.
+
 * **Fin de línea** coherente (evita CRLF):
 
   ```powershell
   git config --global core.autocrlf input
   ```
+
 * **Energía**: Perfil **Alto rendimiento** (mejora estabilidad del hypervisor).
+
 * **Registra en el Manual**: versión de Windows, CPU, RAM, disco, confirmación de virtualización habilitada.
 
 ---
@@ -28,18 +35,18 @@
 Si PowerShell bloquea `*.ps1`, tienes tres opciones. En Windows 10 Home lo más práctico es **usar wrappers `.cmd`**:
 
 1. **Wrappers `.cmd`** (recomendado): `npm.cmd`, `pnpm.cmd`, `npx.cmd`.
+
 2. Permitir scripts para tu usuario:
 
    ```powershell
    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
    ```
+
 3. Solo para la sesión:
 
    ```powershell
    Set-ExecutionPolicy -Scope Process Bypass
    ```
-
-> Con esto evitas “la ejecución de scripts está deshabilitada”.
 
 ---
 
@@ -60,17 +67,14 @@ Si PowerShell bloquea `*.ps1`, tienes tres opciones. En Windows 10 Home lo más 
    corepack --version
    pnpm.cmd -v
    ```
-4. (Opcional pero recomendable) **Gestor de versiones** para fijar LTS por proyecto:
-
-   * `fnm` o `nvs` según prefieras; así evitas “drift” de versiones entre máquinas.
-
-> Si `pnpm` sin `.cmd` falla, usa siempre `pnpm.cmd` o aplica 0.2.
+4. (Opcional) **Gestor de versiones** (`fnm` o `nvs`) para fijar LTS por proyecto.
 
 ---
 
 ## 0.4 Git y GitHub CLI
 
 1. Instala **Git** (marca “Git from command line”).
+
 2. Configura identidad:
 
    ```powershell
@@ -80,6 +84,7 @@ Si PowerShell bloquea `*.ps1`, tienes tres opciones. En Windows 10 Home lo más 
    git config --global core.autocrlf input
    git config --global core.longpaths true
    ```
+
 3. (Opcional) **GitHub CLI**:
 
    ```powershell
@@ -103,8 +108,6 @@ Si PowerShell bloquea `*.ps1`, tienes tres opciones. En Windows 10 Home lo más 
   }
   ```
 
-> Abre el proyecto **desde WSL (Ubuntu)** con la extensión **Remote – WSL**. Minimiza problemas de paths, watchers y CRLF.
-
 ---
 
 ## 0.6 WSL2 y Docker Desktop (imprescindible en Win10 Home)
@@ -120,12 +123,13 @@ Reinicia.
 
 ### 0.6.2 Instalar/actualizar WSL
 
-* Instala Ubuntu (si no la tienes):
+* Instalar Ubuntu (si no la tienes):
 
   ```powershell
   wsl --install -d Ubuntu
   ```
-* Actualiza kernel y fija WSL2 por defecto:
+
+* Actualizar kernel y fijar WSL2:
 
   ```powershell
   wsl --update
@@ -133,32 +137,70 @@ Reinicia.
   wsl --status
   ```
 
+#### 🔍 Comandos útiles para listar y limpiar distribuciones
+
+* Listar distribuciones instaladas:
+
+  ```powershell
+  wsl --list --verbose
+  ```
+* Eliminar una que no uses:
+
+  ```powershell
+  wsl --unregister <NombreDistribucion>
+  ```
+* Ver espacio usado por cada distro:
+
+  ```powershell
+  wsl --system
+  ```
+
 ### 0.6.3 Instalar y configurar Docker Desktop
 
 * **General**: activa **“Use the WSL 2 based engine”**.
 * **Resources → WSL Integration**: habilita **Ubuntu**.
-* **Resources → Advanced**: asigna **4 vCPU** y **6–8 GB RAM** (flujo cómodo con Next.js + Prisma + Postgres).
-* **Smoke test**:
+* **Resources → Advanced**: asigna **4 vCPU** y **6–8 GB RAM**.
+
+#### 🔍 Comandos útiles para revisar y limpiar Docker
+
+* Listar imágenes locales:
 
   ```powershell
-  docker version
-  docker info
-  docker run --rm hello-world
+  docker images
+  ```
+* Listar contenedores (activos e inactivos):
+
+  ```powershell
+  docker ps -a
+  ```
+* Eliminar contenedor que no usas:
+
+  ```powershell
+  docker rm <container_id>
+  ```
+* Eliminar imagen que ya no sirve:
+
+  ```powershell
+  docker rmi <image_id>
+  ```
+* Liberar espacio (¡cuidado, revisa antes!):
+
+  ```powershell
+  docker system df
+  docker system prune -a
   ```
 
-> Limpieza prudente: `docker system prune` (verifica antes qué se eliminará).
+> Esta configuración soporta la infraestructura de pruebas piloto y despliegues CI/CD contemplados en el EVS.
 
 ---
 
 ## 0.7 PostgreSQL en contenedor — fija versión
 
-* Evita `latest`. Fija **PostgreSQL 16** por compatibilidad amplia hoy.
+* Evita `latest`. Fija **PostgreSQL 16** por compatibilidad.
 
   ```powershell
   docker pull postgres:16
   ```
-
-> Si eliges 17, sé consistente en **todos** los entornos (local, CI/CD, cloud).
 
 ---
 
@@ -170,8 +212,11 @@ Reinicia.
   sudo apt update && sudo apt install -y postgresql-client
   psql --version
   ```
+
 * **mkcert** (TLS local), **7-Zip/PeaZip** (backups/exports).
-* Prepara un **`.env.example`** (sin credenciales) desde ya.
+
+* **`.env.example`**: obligatorio desde esta fase. Debe incluir todas las variables del sistema **sin credenciales** (ejemplo: `DATABASE_URL`, `NEXTAUTH_URL`, `NEXT_PUBLIC_MAPBOX_TOKEN`).
+  👉 Esto responde a los RNF-04 (seguridad de datos) y RNF-06 (compatibilidad tecnológica) definidos en el Charter/ERS.
 
 ---
 
@@ -185,15 +230,17 @@ Reinicia.
 * [ ] **VS Code** con ESLint/Prettier/Docker/**Remote – WSL**.
 * [ ] **Git** configurado (nombre/email, `core.autocrlf input`, `core.longpaths true`).
 * [ ] Red sin bloqueos a npm y registros de contenedores.
+* [ ] **`.env.example` creado** (sin credenciales, obligatorio).
+* [ ] **Validar cumplimiento con RNF-06 (compatibilidad tecnológica) y RNF-02 (escalabilidad/disponibilidad)** del Charter/ERS.
 
 ---
 
 ### Buenas prácticas (orientadas a SIGECOVIP)
 
 * **Version pinning**: Node LTS, `postgres:16`, acciones de CI (versionadas).
-* **Reproducibilidad**: trabaja **dentro de WSL** para evitar sorpresas Win/Unix.
-* **Secretos**: nunca comprometer `.env`; usa `.env.example` y define estrategia para CI/Cloud.
-* **Espacio Docker**: planifica limpieza/volúmenes (SIGECOVIP almacenará imágenes/archivos).
+* **Reproducibilidad**: trabaja dentro de WSL para evitar sorpresas Win/Unix.
+* **Secretos**: nunca comprometer `.env`; usa `.env.example`.
+* **Espacio Docker**: planifica limpieza (`docker system prune`) para no saturar disco.
 * **Rendimiento**: monitoriza RAM/CPU asignados a WSL/Docker según crezca la base y el scraping/cargas.
 
 ---
