@@ -103,72 +103,43 @@ NODE_ENV="development"
 Usa el modelo **oficial** de NextAuth con Prisma (User/Account/Session/VerificationToken) y añade tus entidades de dominio. Abre `prisma/schema.prisma` y usa algo como:
 
 ```prisma
-generator client { provider = "prisma-client-js" }
+generator client {
+  provider = "prisma-client-js"
+}
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-enum RolUsuario { INSPECTOR COORDINADOR }
-enum EstatusOperativo { VIGENTE IRREGULAR SANCIONADO EN_TRAMITE }
+enum RolUsuario {
+  INSPECTOR
+  COORDINADOR
+}
 
-model User {
-  id            String   @id @default(cuid())
-  name          String?
-  email         String?  @unique
-  emailVerified DateTime?
-  image         String?
-  role          RolUsuario @default(INSPECTOR)
+enum EstatusOperativo {
+  VIGENTE
+  IRREGULAR
+  SANCIONADO
+  EN_TRAMITE
+}
 
-  accounts      Account[]
-  sessions      Session[]
+model Usuario {
+  id            String   @id @default(uuid())
+  nombre        String
+  email         String   @unique
+  hashPassword  String
+  rol           RolUsuario
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
 
-  // Relaciones a dominio
   inspecciones  Inspeccion[] @relation("InspectorInspecciones")
   reportes      Reporte[]    @relation("AutorReportes")
   auditorias    Auditoria[]  @relation("AutorAuditorias")
 }
 
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-// === Dominio SIGECOVIP ===
 model Comerciante {
-  id               String   @id @default(cuid())
+  id               String            @id @default(uuid())
   titularNombre    String
   giro             String
   superficieM2     Decimal
@@ -177,67 +148,67 @@ model Comerciante {
   tipoMontaje      String
   licenciaPermiso  String?
   direccion        String
-  latitud          Decimal  @db.Decimal(9,6)
-  longitud         Decimal  @db.Decimal(9,6)
+  latitud          Decimal           @db.Decimal(9,6)
+  longitud         Decimal           @db.Decimal(9,6)
   organizacion     String?
   estatus          EstatusOperativo
-  fotos            Json?
-  documentos       Json?
-  creadoEn         DateTime @default(now())
-  actualizadoEn    DateTime @updatedAt
+  fotos            Json?             // Arreglo de URLs
+  documentos       Json?             // Arreglo de URLs
+  creadoEn         DateTime          @default(now())
+  actualizadoEn    DateTime          @updatedAt
 
   inspecciones     Inspeccion[]
   reportesIncluidos ReporteComerciante[]
 }
 
 model Inspeccion {
-  id            String    @id @default(cuid())
+  id            String    @id @default(uuid())
   fechaHora     DateTime  @default(now())
   notas         String
-  evidencias    Json?
+  evidencias    Json?     // Arreglo de URLs
   comercianteId String
   inspectorId   String
 
   comerciante   Comerciante @relation(fields: [comercianteId], references: [id])
-  inspector     User        @relation("InspectorInspecciones", fields: [inspectorId], references: [id])
+  inspector     Usuario     @relation("InspectorInspecciones", fields: [inspectorId], references: [id])
 
   creadoEn      DateTime @default(now())
 }
 
 model Reporte {
-  id              String              @id @default(cuid())
+  id              String              @id @default(uuid())
   tipo            String
   rangoFechas     String
-  formato         String
+  formato         String              // "PDF" | "Excel" | "CSV"
   fechaGeneracion DateTime            @default(now())
   autorId         String
 
-  autor           User                @relation("AutorReportes", fields: [autorId], references: [id])
+  autor           Usuario             @relation("AutorReportes", fields: [autorId], references: [id])
   incluye         ReporteComerciante[]
 
   creadoEn        DateTime            @default(now())
 }
 
 model ReporteComerciante {
-  id            String      @id @default(cuid())
-  reporteId     String
+  id           String      @id @default(uuid())
+  reporteId    String
   comercianteId String
 
-  reporte       Reporte     @relation(fields: [reporteId], references: [id])
-  comerciante   Comerciante @relation(fields: [comercianteId], references: [id])
+  reporte      Reporte     @relation(fields: [reporteId], references: [id])
+  comerciante  Comerciante @relation(fields: [comercianteId], references: [id])
 
   @@unique([reporteId, comercianteId])
 }
 
 model Auditoria {
-  id        String   @id @default(cuid())
-  usuarioId String
-  accion    String   // alta|baja|modificacion|login|reporte
-  modulo    String   // comerciante|inspeccion|reporte|usuario
-  fechaHora DateTime @default(now())
-  detalle   String?
+  id         String   @id @default(uuid())
+  usuarioId  String
+  accion     String   // "alta" | "baja" | "modificacion" | "login" | "reporte"
+  modulo     String   // "comerciante" | "inspeccion" | "reporte" | "usuario"
+  fechaHora  DateTime @default(now())
+  detalle    String?
 
-  autor     User     @relation("AutorAuditorias", fields: [usuarioId], references: [id])
+  autor      Usuario  @relation("AutorAuditorias", fields: [usuarioId], references: [id])
 }
 ```
 
