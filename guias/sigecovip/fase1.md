@@ -51,10 +51,161 @@ NODE_ENV="development"
 
 ---
 
-## 4) Prisma con **tu** `schema.prisma` (sin romper nada)
+## 4) Prisma `schema.prisma`
 
-1. Copia tu archivo a `sigecovip/prisma/schema.prisma`.
-2. Valida, genera y migra:
+1. Copia en el archivo `sigecovip/prisma/schema.prisma`.
+
+```prisma
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+enum RolUsuario {
+    INSPECTOR
+    COORDINADOR
+}
+
+enum EstatusOperativo {
+    VIGENTE
+    IRREGULAR
+    SANCIONADO
+    EN_TRAMITE
+}
+
+/**
+ * Recomendado: formalizar strings como enums
+ */
+enum FormatoReporte {
+    PDF
+    EXCEL
+    CSV
+}
+
+enum AccionAuditoria {
+    ALTA
+    BAJA
+    MODIFICACION
+    LOGIN
+    REPORTE
+}
+
+enum ModuloAuditoria {
+    COMERCIANTE
+    INSPECCION
+    REPORTE
+    USUARIO
+}
+
+model Usuario {
+    id            String     @id @default(uuid())
+    nombre        String
+    email         String     @unique
+    hashPassword  String
+    rol           RolUsuario
+    creadoEn      DateTime   @default(now())
+    actualizadoEn DateTime   @updatedAt
+
+    inspecciones Inspeccion[] @relation("InspectorInspecciones")
+    reportes     Reporte[]    @relation("AutorReportes")
+    auditorias   Auditoria[]  @relation("AutorAuditorias")
+
+    @@index([email])
+}
+
+model Comerciante {
+    id               String           @id @default(uuid())
+    titularNombre    String
+    giro             String
+    superficieM2     Decimal          @db.Decimal(10, 2) // precisión sugerida
+    diasOperacion    String
+    horarioOperacion String
+    tipoMontaje      String
+    licenciaPermiso  String?
+    direccion        String
+    latitud          Decimal          @db.Decimal(9, 6)
+    longitud         Decimal          @db.Decimal(9, 6)
+    organizacion     String?
+    estatus          EstatusOperativo
+    fotos            Json? // Arreglo de URLs
+    documentos       Json? // Arreglo de URLs
+    creadoEn         DateTime         @default(now())
+    actualizadoEn    DateTime         @updatedAt
+
+    inspecciones      Inspeccion[]
+    reportesIncluidos ReporteComerciante[]
+
+    @@index([estatus])
+    @@index([organizacion])
+    @@index([latitud, longitud]) // útil para queries geográficas
+}
+
+model Inspeccion {
+    id            String   @id @default(uuid())
+    fechaHora     DateTime @default(now())
+    notas         String
+    evidencias    Json? // Arreglo de URLs
+    comercianteId String
+    inspectorId   String
+
+    comerciante Comerciante @relation(fields: [comercianteId], references: [id], onDelete: Cascade)
+    inspector   Usuario     @relation("InspectorInspecciones", fields: [inspectorId], references: [id], onDelete: Restrict)
+
+    creadoEn DateTime @default(now())
+
+    @@index([comercianteId])
+    @@index([inspectorId])
+    @@index([fechaHora])
+}
+
+model Reporte {
+    id              String         @id @default(uuid())
+    tipo            String
+    rangoFechas     String
+    formato         FormatoReporte // antes: String
+    fechaGeneracion DateTime       @default(now())
+    autorId         String
+
+    autor   Usuario              @relation("AutorReportes", fields: [autorId], references: [id], onDelete: Restrict)
+    incluye ReporteComerciante[]
+
+    creadoEn DateTime @default(now())
+
+    @@index([autorId, fechaGeneracion])
+}
+
+model ReporteComerciante {
+    id            String @id @default(uuid())
+    reporteId     String
+    comercianteId String
+
+    reporte     Reporte     @relation(fields: [reporteId], references: [id], onDelete: Cascade)
+    comerciante Comerciante @relation(fields: [comercianteId], references: [id], onDelete: Cascade)
+
+    @@unique([reporteId, comercianteId])
+    @@index([reporteId])
+    @@index([comercianteId])
+}
+
+model Auditoria {
+    id        String          @id @default(uuid())
+    usuarioId String?
+    accion    AccionAuditoria // antes: String
+    modulo    ModuloAuditoria // antes: String
+    fechaHora DateTime        @default(now())
+    detalle   String?
+
+    autor Usuario? @relation("AutorAuditorias", fields: [usuarioId], references: [id], onDelete: SetNull)
+
+    @@index([usuarioId, fechaHora])
+}
+```
+
+3. Valida, genera y migra:
 
 ```powershell
 pnpm.cmd prisma validate
