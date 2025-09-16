@@ -1,57 +1,35 @@
-# Fase 1 — Inicialización del Proyecto (SIGECOVIP)
+# Fase 1 — Inicialización “sin errores” (SIGECOVIP)
 
-## 1) Objetivo y resultados esperados
-
-Dejar el proyecto **Create-T3-App** funcionando con base sólida y reproducible:
-
-* Git inicializado.
-* **PostgreSQL 16 en Docker** (versión fijada).
-* **.env** (local, no versionado) y **.env.example** (versionado, sin secretos).
-* **Prisma** con migraciones iniciales (NextAuth + entidades SIGECOVIP).
-* **NextAuth** operativo (secret configurado).
-* **tRPC** con healthcheck.
-* **ESLint + Prettier + Husky (pre-commit)** con **`pnpm exec`** para Windows.
-* **CI en GitHub Actions** con Postgres de servicio, variables mínimas y pinning.
-  (Alineado a RNF y alcance del Charter/ERS/EVS.)
-
----
-
-## 2) Crear el proyecto base
-
-En **PowerShell** (usa wrappers `.cmd`):
+## 1) Crear proyecto base (Create-T3-App)
 
 ```powershell
 cd D:\Dev
 pnpm.cmd dlx create-t3-app@latest sigecovip
 ```
 
-Selecciona:
+Selecciona: **TypeScript**, **Tailwind**, **tRPC**, **Prisma**, **App Router**, **PostgreSQL**, **ESLint+Prettier**, **Init Git**, **Run pnpm install**, **@/**.
 
-* TypeScript ✅ Tailwind ✅ tRPC ✅
-* NextAuth.js ✅ Prisma ✅ App Router ✅
-* PostgreSQL ✅ ESLint + Prettier ✅
-* Init Git ✅ Run pnpm install ✅
-* Import alias @/ ✅
-
-> Soporta RF/RNF del alcance definido.
+> Nota: si la plantilla ofrece NextAuth y aún no lo usarás, **no lo marques**; si lo marcas, no usaremos `protectedProcedure` en esta fase para evitar dependencias a tablas de auth.
 
 ---
 
-## 3) PostgreSQL 16 en Docker (local, versión fijada)
+## 2) PostgreSQL 16 en Docker (una sola línea, Windows)
 
 ```powershell
-docker pull postgres:16
 docker run --name pg-sigecovip -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=sigecovip -p 5432:5432 -d postgres:16
-docker ps -a
 ```
 
-> Evita `latest` y garantiza compatibilidad tecnológica.
+**Si 5432 ya está ocupado**, usa 5433:
+
+```powershell
+docker run --name pg-sigecovip -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=sigecovip -p 5433:5432 -d postgres:16
+```
 
 ---
 
-## 4) Variables de entorno
+## 3) Variables de entorno
 
-Archivo **`sigecovip/.env`** (local, NO versionar):
+**`sigecovip/.env`** (local, NO versionar):
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sigecovip?schema=public"
@@ -60,7 +38,9 @@ NEXTAUTH_SECRET="cambia-esto-por-un-valor-largo-y-seguro"
 NODE_ENV="development"
 ```
 
-Archivo **`sigecovip/.env.example`** (SÍ versionar, sin secretos):
+*Si usaste el puerto 5433, cambia `@localhost:5433`.*
+
+**`sigecovip/.env.example`** (SÍ versionar):
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public"
@@ -69,282 +49,45 @@ NEXTAUTH_SECRET=""
 NODE_ENV="development"
 ```
 
-> Buenas prácticas y RNF-04 (seguridad).
-
 ---
 
-## 5) Prisma — esquema inicial y migraciones
+## 4) Prisma con **tu** `schema.prisma` (sin romper nada)
 
-1. Generar cliente y migración base:
-
-```prisma
-generator client {
-    provider = "prisma-client-js"
-}
-
-datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
-}
-
-enum RolUsuario {
-    INSPECTOR
-    COORDINADOR
-}
-
-enum EstatusOperativo {
-    VIGENTE
-    IRREGULAR
-    SANCIONADO
-    EN_TRAMITE
-}
-
-/**
- * Recomendado: formalizar strings como enums
- */
-enum FormatoReporte {
-    PDF
-    EXCEL
-    CSV
-}
-
-enum AccionAuditoria {
-    ALTA
-    BAJA
-    MODIFICACION
-    LOGIN
-    REPORTE
-}
-
-enum ModuloAuditoria {
-    COMERCIANTE
-    INSPECCION
-    REPORTE
-    USUARIO
-}
-
-model Usuario {
-    id            String     @id @default(uuid())
-    nombre        String
-    email         String     @unique
-    hashPassword  String
-    rol           RolUsuario
-    creadoEn      DateTime   @default(now())
-    actualizadoEn DateTime   @updatedAt
-
-    inspecciones Inspeccion[] @relation("InspectorInspecciones")
-    reportes     Reporte[]    @relation("AutorReportes")
-    auditorias   Auditoria[]  @relation("AutorAuditorias")
-
-    @@index([email])
-}
-
-model Comerciante {
-    id               String           @id @default(uuid())
-    titularNombre    String
-    giro             String
-    superficieM2     Decimal          @db.Decimal(10, 2) // precisión sugerida
-    diasOperacion    String
-    horarioOperacion String
-    tipoMontaje      String
-    licenciaPermiso  String?
-    direccion        String
-    latitud          Decimal          @db.Decimal(9, 6)
-    longitud         Decimal          @db.Decimal(9, 6)
-    organizacion     String?
-    estatus          EstatusOperativo
-    fotos            Json? // Arreglo de URLs
-    documentos       Json? // Arreglo de URLs
-    creadoEn         DateTime         @default(now())
-    actualizadoEn    DateTime         @updatedAt
-
-    inspecciones      Inspeccion[]
-    reportesIncluidos ReporteComerciante[]
-
-    @@index([estatus])
-    @@index([organizacion])
-    @@index([latitud, longitud]) // útil para queries geográficas
-}
-
-model Inspeccion {
-    id            String   @id @default(uuid())
-    fechaHora     DateTime @default(now())
-    notas         String
-    evidencias    Json? // Arreglo de URLs
-    comercianteId String
-    inspectorId   String
-
-    comerciante Comerciante @relation(fields: [comercianteId], references: [id], onDelete: Cascade)
-    inspector   Usuario     @relation("InspectorInspecciones", fields: [inspectorId], references: [id], onDelete: Restrict)
-
-    creadoEn DateTime @default(now())
-
-    @@index([comercianteId])
-    @@index([inspectorId])
-    @@index([fechaHora])
-}
-
-model Reporte {
-    id              String         @id @default(uuid())
-    tipo            String
-    rangoFechas     String
-    formato         FormatoReporte // antes: String
-    fechaGeneracion DateTime       @default(now())
-    autorId         String
-
-    autor   Usuario              @relation("AutorReportes", fields: [autorId], references: [id], onDelete: Restrict)
-    incluye ReporteComerciante[]
-
-    creadoEn DateTime @default(now())
-
-    @@index([autorId, fechaGeneracion])
-}
-
-model ReporteComerciante {
-    id            String @id @default(uuid())
-    reporteId     String
-    comercianteId String
-
-    reporte     Reporte     @relation(fields: [reporteId], references: [id], onDelete: Cascade)
-    comerciante Comerciante @relation(fields: [comercianteId], references: [id], onDelete: Cascade)
-
-    @@unique([reporteId, comercianteId])
-    @@index([reporteId])
-    @@index([comercianteId])
-}
-
-model Auditoria {
-    id        String          @id @default(uuid())
-    usuarioId String?
-    accion    AccionAuditoria // antes: String
-    modulo    ModuloAuditoria // antes: String
-    fechaHora DateTime        @default(now())
-    detalle   String?
-
-    autor Usuario? @relation("AutorAuditorias", fields: [usuarioId], references: [id], onDelete: SetNull)
-
-    @@index([usuarioId, fechaHora])
-}
-```
+1. Copia tu archivo a `sigecovip/prisma/schema.prisma`.
+2. Valida, genera y migra:
 
 ```powershell
+pnpm.cmd prisma validate
 pnpm.cmd prisma generate
 pnpm.cmd prisma migrate dev --name init
 ```
 
-2. Scripts útiles en `package.json`:
+> Estos comandos **no dependen** de routers ni de NextAuth. Si tu schema no incluye modelos de auth, no pasa nada: esta fase no los usa.
+
+---
+
+## 5) Scripts útiles (opcionales)
+
+En `package.json`:
 
 ```json
 "scripts": {
+  "db:validate": "prisma validate",
   "db:generate": "prisma generate",
   "db:migrate": "prisma migrate dev",
-  "db:deploy": "prisma migrate deploy"
+  "db:deploy": "prisma migrate deploy",
+  "lint": "next lint",
+  "format": "prettier --write ."
 }
 ```
 
-> El modelo debe cubrir Usuario/Comerciante/Inspección/Reporte/Auditoría (ver Diseño).
-
 ---
 
-## 6) Calidad de código y hooks (ESLint/Prettier/Husky + lint-staged) — **con fix para Windows**
+## 6) tRPC — healthcheck **minimalista y desacoplado del esquema**
 
-1. Instalar dependencias:
+> No usa `protectedProcedure`, no toca DB, no importa modelos. 100% seguro.
 
-```powershell
-pnpm.cmd add -D husky lint-staged eslint prettier
-```
-
-2. Activar Husky:
-
-```powershell
-pnpm.cmd dlx husky-init
-pnpm.cmd install
-```
-
-3. Configurar **lint-staged** en `package.json`:
-
-```json
-"lint-staged": {
-  "*.{js,ts,tsx}": ["eslint --fix", "prettier --write"],
-  "*.{json,md,css,scss}": ["prettier --write"]
-}
-```
-
-4. **Hook pre-commit** (reemplaza `.husky/pre-commit`):
-
-```sh
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
-pnpm exec lint-staged
-```
-
-> Uso de **`pnpm exec`** evita el error “`lint-staged` no se reconoce…” en Windows.
-
-**Tip (pnpm builds):**
-
-```powershell
-pnpm.cmd approve-builds
-```
-
-Selecciona Prisma/Tailwind si ves el aviso de “Ignored build scripts”.
-
----
-
-## 7) CI en GitHub Actions (con Postgres de servicio, versión fijada)
-
-Crea **`.github/workflows/ci.yml`**:
-
-```yaml
-name: CI
-on: [push, pull_request]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: sigecovip
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd="pg_isready -U postgres"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sigecovip?schema=public
-      NEXTAUTH_SECRET: test-secret
-      NEXTAUTH_URL: http://localhost:3000
-      NODE_ENV: test
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-      - run: corepack enable
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm prisma generate
-      - run: pnpm prisma migrate deploy
-      - run: pnpm lint
-      - run: pnpm build
-      - run: pnpm test --if-present
-```
-
-> Cumple RNF-06 (compatibilidad) y CI con Postgres 16.
-
----
-
-## 8) tRPC — healthcheck mínimo
-
-`src/server/api/routers/health.ts`
+Crea `src/server/api/routers/health.ts`:
 
 ```ts
 import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
@@ -354,55 +97,127 @@ export const healthRouter = createTRPCRouter({
 });
 ```
 
-Expón `healthRouter` en tu `appRouter` y verifica desde el panel de tRPC o un fetch simple.
+Regístralo en `src/server/api/root.ts`:
+
+```ts
+import { createTRPCRouter } from "@/server/api/trpc";
+import { healthRouter } from "./routers/health";
+
+export const appRouter = createTRPCRouter({
+  health: healthRouter,
+});
+export type AppRouter = typeof appRouter;
+```
+
+Levanta dev y verifica:
+
+```powershell
+pnpm.cmd dev
+```
+
+En el panel de tRPC deberías ver `health.ping` respondiendo `{ ok: true, ts: ... }`.
 
 ---
 
-## 9) NextAuth — secreto y URL operativos
+## 7) Husky + lint-staged en **Windows** (fix definitivo)
 
-En `.env`:
+> Evita el error “`lint-staged` no se reconoce…” usando `pnpm exec` y LF en el hook.
 
-```
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="cambia-esto-por-un-valor-largo-y-seguro"
-```
+1. Instala:
 
-En `.env.example` (sin secretos):
-
-```
-NEXTAUTH_URL=""
-NEXTAUTH_SECRET=""
+```powershell
+pnpm.cmd add -D husky lint-staged eslint prettier
 ```
 
-> Requisito de seguridad (RNF-04) y alcance funcional.
+2. Inicializa Husky:
 
----
+```powershell
+pnpm.cmd dlx husky-init
+pnpm.cmd install
+```
 
-## 10) Ajustes de VS Code recomendados
-
-`.vscode/settings.json`
+3. En `package.json`, añade:
 
 ```json
-{
-  "editor.formatOnSave": true,
-  "editor.codeActionsOnSave": { "source.fixAll.eslint": true },
-  "eslint.validate": ["typescript", "typescriptreact", "javascript"]
+"lint-staged": {
+  "*.{js,ts,tsx}": ["eslint --fix", "prettier --write"],
+  "*.{json,md,css,scss}": ["prettier --write"]
 }
 ```
 
-> Flujo recomendado desde Fase 0.
+4. Reemplaza `.husky/pre-commit` por EXACTAMENTE:
+
+```sh
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+pnpm exec lint-staged
+```
+
+5. Asegura finales de línea LF en el hook:
+
+```powershell
+git config --global core.autocrlf input
+```
+
+6. Prueba:
+
+```powershell
+pnpm.cmd exec lint-staged --version
+git add -A
+git commit -m "test: husky ok"
+```
 
 ---
 
-## 11) Checklist final de Fase 1
+## 8) Verificaciones rápidas (solo si aplica)
 
-* [ ] Contenedor **`pg-sigecovip`** (imagen `postgres:16`) corriendo.
+* **Puerto en uso** (5432/5433):
+
+```powershell
+netstat -a -n -o | findstr :5432
+```
+
+Si ocupado → usa la variante 5433 y ajusta `DATABASE_URL`.
+
+* **Contenedor sano**:
+
+```powershell
+docker ps -a
+docker logs pg-sigecovip --tail=50
+```
+
+* **Conexión a la DB**:
+
+```powershell
+docker exec -it pg-sigecovip psql -U postgres -d sigecovip -c "select 1;"
+```
+
+* **Prisma listo**:
+
+```powershell
+pnpm.cmd prisma validate
+pnpm.cmd prisma generate
+pnpm.cmd prisma migrate dev --name init
+```
+
+* **App arriba y tRPC OK**:
+
+```powershell
+pnpm.cmd dev
+```
+
+Abre la app, revisa `health.ping`.
+
+---
+
+## 9) Checklist de salida (Fase 1)
+
+* [ ] Contenedor `pg-sigecovip` (`postgres:16`) corriendo en el puerto correcto.
 * [ ] `.env` local correcto y **`.env.example`** versionado (sin secretos).
-* [ ] `pnpm prisma migrate dev` aplicado (tablas creadas).
-* [ ] **Husky pre-commit** ejecuta `pnpm exec lint-staged` sin errores.
-* [ ] `pnpm lint`, `pnpm build` y (si aplica) `pnpm test` OK.
-* [ ] **CI** verde en GitHub con Postgres 16 de servicio.
-* [ ] tRPC **/health.ping** responde `{ ok: true }`.
-* [ ] **NextAuth** sin warnings por `NEXTAUTH_SECRET`.
+* [ ] Prisma `validate/generate/migrate` ejecutados **sobre tu schema** sin errores.
+* [ ] tRPC **health** responde OK (sin depender de DB).
+* [ ] Husky **pre-commit** corre `pnpm exec lint-staged` sin fallos en Windows.
+* [ ] La app levanta con `pnpm dev` sin errores complejos.
 
 ---
