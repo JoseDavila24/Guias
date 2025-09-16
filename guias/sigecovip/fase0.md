@@ -1,246 +1,96 @@
-# Fase 0 — Preparación del entorno en Windows 10 Home (versión revisada)
+# Fase 0 — Preparación “ruta sencilla” (Windows 10/11)
 
-## 0.1 Requisitos del sistema y políticas del SO
+## 0.1 Decisiones de arranque (enfoque rápido)
 
-* **Windows 10 Home 20H2+** actualizado.
+* **Plantilla**: `create-t3-app` con: **TypeScript, Tailwind, tRPC, Prisma, App Router, NextAuth**.
+* **DB**: **PostgreSQL 16 en Docker** (fijar versión; sin `latest`).
+* **Auth inicial**: **NextAuth** con **Credentials Provider** (correo/contraseña) para evitar configurar OAuth desde el día 1. En la Fase 1 definimos el `User` en Prisma, hashing y el `authorize()` mínimo.
+* **Variables**: `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL` y `.env.example` desde el inicio (sin secretos). Esto te evita problemas de CI/CD y de onboarding del equipo.&#x20;
 
-* CPU con **VT-x/AMD-V** habilitado en BIOS/UEFI.
+## 0.2 Requisitos del sistema y ajustes de Windows (sin dolor)
 
-* **RAM**: 16 GB recomendados (mínimo 8 GB). **Disco**: ≥ 30 GB libres (mejor 50–80 GB si usarás imágenes Docker y datos).
-
-* **Red** con salida a `registry.npmjs.org` y registros de contenedores (Docker Hub/GHCR).
-
-* **Rutas largas** (evita errores en `node_modules`):
+* Windows actualizado, **virtualización** (VT-x/AMD-V) activa, **16 GB RAM** recomendado.
+* Evita problemas de ruta y fin de línea:
 
   ```powershell
   git config --global core.longpaths true
-  ```
-
-  Y, si puedes, habilita “Enable Win32 long paths” en Windows.
-
-* **Fin de línea** coherente (evita CRLF):
-
-  ```powershell
   git config --global core.autocrlf input
   ```
+* **VS Code** con ESLint/Prettier/Tailwind/Prisma/Docker y **Remote–WSL** (opcional pero recomendado).
+* **WSL2 + Docker Desktop con engine WSL2**, y **PostgreSQL 16** descargado.
+  Estos puntos están ya listados y probados en tu Fase 0 previa; mantenlos idénticos para confiabilidad.&#x20;
 
-* **Energía**: Perfil **Alto rendimiento** (mejora estabilidad del hypervisor).
+## 0.3 Herramientas base (Node, pnpm, Git, Docker)
 
-* **Registra en el Manual**: versión de Windows, CPU, RAM, disco, confirmación de virtualización habilitada.
-
----
-
-## 0.2 PowerShell y ejecución de scripts (evitar bloqueos)
-
-Si PowerShell bloquea `*.ps1`, tienes tres opciones. En Windows 10 Home lo más práctico es **usar wrappers `.cmd`**:
-
-1. **Wrappers `.cmd`** (recomendado): `npm.cmd`, `pnpm.cmd`, `npx.cmd`.
-
-2. Permitir scripts para tu usuario:
-
-   ```powershell
-   Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-   ```
-
-3. Solo para la sesión:
-
-   ```powershell
-   Set-ExecutionPolicy -Scope Process Bypass
-   ```
-
----
-
-## 0.3 Node.js LTS + Corepack (pnpm) y gestor de versiones (opcional)
-
-1. Instala **Node.js LTS** (incluye `npm` y **Corepack**).
-2. Habilita pnpm vía Corepack:
-
-   ```powershell
-   corepack enable
-   corepack prepare pnpm@latest --activate
-   ```
-3. Verifica (usa `.cmd` donde aplique):
-
-   ```powershell
-   node -v
-   npm.cmd -v
-   corepack --version
-   pnpm.cmd -v
-   ```
-4. (Opcional) **Gestor de versiones** (`fnm` o `nvs`) para fijar LTS por proyecto.
-
----
-
-## 0.4 Git y GitHub CLI
-
-1. Instala **Git** (marca “Git from command line”).
-
-2. Configura identidad:
-
-   ```powershell
-   git config --global user.name  "Tu Nombre"
-   git config --global user.email "tu@email"
-   git config --global init.defaultBranch main
-   git config --global core.autocrlf input
-   git config --global core.longpaths true
-   ```
-
-3. (Opcional) **GitHub CLI**:
-
-   ```powershell
-   gh --version
-   gh auth login
-   ```
-
----
-
-## 0.5 VS Code (trabajo dentro de WSL) + extensiones
-
-* **VS Code** actualizado.
-* Extensiones mínimas: **ESLint**, **Prettier**, **Tailwind CSS IntelliSense**, **Prisma**, **Docker**, **GitHub Actions**, **Remote – WSL**.
-* Ajustes sugeridos (`.vscode/settings.json`):
-
-  ```json
-  {
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": { "source.fixAll.eslint": true },
-    "eslint.validate": ["typescript", "typescriptreact", "javascript"]
-  }
-  ```
-
----
-
-## 0.6 WSL2 y Docker Desktop (imprescindible en Win10 Home)
-
-### 0.6.1 Activar características (PowerShell **Administrador**)
-
-```powershell
-dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
-dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
-```
-
-Reinicia.
-
-### 0.6.2 Instalar/actualizar WSL
-
-* Instalar Ubuntu (si no la tienes):
+* Instala **Node LTS** (incluye Corepack).
+  Luego:
 
   ```powershell
-  wsl --install -d Ubuntu
+  corepack enable
+  corepack prepare pnpm@latest --activate
+  node -v
+  pnpm.cmd -v
   ```
-
-* Actualizar kernel y fijar WSL2:
+* **Git** con identidad y rama por defecto `main`:
 
   ```powershell
-  wsl --update
-  wsl --set-default-version 2
-  wsl --status
+  git config --global user.name  "Tu Nombre"
+  git config --global user.email "tu@email"
+  git config --global init.defaultBranch main
   ```
-
-#### 🔍 Comandos útiles para listar y limpiar distribuciones
-
-* Listar distribuciones instaladas:
-
-  ```powershell
-  wsl --list --verbose
-  ```
-* Eliminar una que no uses:
-
-  ```powershell
-  wsl --unregister <NombreDistribucion>
-  ```
-* Ver espacio usado por cada distro:
-
-  ```powershell
-  wsl --system
-  ```
-
-### 0.6.3 Instalar y configurar Docker Desktop
-
-* **General**: activa **“Use the WSL 2 based engine”**.
-* **Resources → WSL Integration**: habilita **Ubuntu**.
-* **Resources → Advanced**: asigna **4 vCPU** y **6–8 GB RAM**.
-
-#### 🔍 Comandos útiles para revisar y limpiar Docker
-
-* Listar imágenes locales:
-
-  ```powershell
-  docker images
-  ```
-* Listar contenedores (activos e inactivos):
-
-  ```powershell
-  docker ps -a
-  ```
-* Eliminar contenedor que no usas:
-
-  ```powershell
-  docker rm <container_id>
-  ```
-* Eliminar imagen que ya no sirve:
-
-  ```powershell
-  docker rmi <image_id>
-  ```
-* Liberar espacio (¡cuidado, revisa antes!):
-
-  ```powershell
-  docker system df
-  docker system prune -a
-  ```
-
-> Esta configuración soporta la infraestructura de pruebas piloto y despliegues CI/CD contemplados en el EVS.
-
----
-
-## 0.7 PostgreSQL en contenedor — fija versión
-
-* Evita `latest`. Fija **PostgreSQL 16** por compatibilidad.
+* **Docker Desktop** activado con WSL2. **Fija Postgres 16**:
 
   ```powershell
   docker pull postgres:16
   ```
 
----
+  (Fijar versión evita sorpresas y cumple tus RNF de compatibilidad).&#x20;
 
-## 0.8 Utilidades opcionales (útiles para el flujo de datos)
+## 0.4 Plantilla de variables de entorno (desde ya)
 
-* **Cliente psql** en WSL:
+Crea **`.env.example`** en blanco de secretos pero completo en claves:
 
-  ```bash
-  sudo apt update && sudo apt install -y postgresql-client
-  psql --version
-  ```
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public"
+NEXTAUTH_URL=""
+NEXTAUTH_SECRET=""
+NODE_ENV="development"
+```
 
-* **mkcert** (TLS local), **7-Zip/PeaZip** (backups/exports).
+* En la Fase 1 copia esto a `.env` y rellena con tus valores locales (incluido el puerto real de Postgres: 5432/5433). Esta práctica ya la dejaste establecida y conviene mantenerla.&#x20;
 
-* **`.env.example`**: obligatorio desde esta fase. Debe incluir todas las variables del sistema **sin credenciales** (ejemplo: `DATABASE_URL`, `NEXTAUTH_URL`, `NEXT_PUBLIC_MAPBOX_TOKEN`).
-  👉 Esto responde a los RNF-04 (seguridad de datos) y RNF-06 (compatibilidad tecnológica) definidos en el Charter/ERS.
+## 0.5 PostgreSQL en Docker (pre-chequeo)
 
----
+Antes de crear el proyecto, asegúrate de que tu equipo corre contenedores sin trabas:
 
-## 0.9 Validaciones finales (checklist)
+```powershell
+docker run --rm hello-world
+docker images
+docker ps -a
+```
 
-* [ ] `node -v`, `npm.cmd -v`, `pnpm.cmd -v`, `corepack --version` OK.
-* [ ] Política de ejecución decidida o uso de wrappers `.cmd`.
-* [ ] **WSL2** por defecto y `wsl --update` aplicado.
-* [ ] **Docker Desktop** con engine WSL2 y `hello-world` OK.
-* [ ] Imagen Postgres **fijada**: `postgres:16` descargada.
-* [ ] **VS Code** con ESLint/Prettier/Docker/**Remote – WSL**.
-* [ ] **Git** configurado (nombre/email, `core.autocrlf input`, `core.longpaths true`).
-* [ ] Red sin bloqueos a npm y registros de contenedores.
-* [ ] **`.env.example` creado** (sin credenciales, obligatorio).
-* [ ] **Validar cumplimiento con RNF-06 (compatibilidad tecnológica) y RNF-02 (escalabilidad/disponibilidad)** del Charter/ERS.
+Luego, en la Fase 1, lanzarás el contenedor Postgres y apuntarás `DATABASE_URL`. (Tu guía previa ya trae las one-liners y validaciones rápidas para puertos, logs y `psql`—las reutilizaremos tal cual).&#x20;
 
----
+## 0.6 VS Code: configuración mínima para código limpio
 
-### Buenas prácticas (orientadas a SIGECOVIP)
+Archivo `.vscode/settings.json` sugerido:
 
-* **Version pinning**: Node LTS, `postgres:16`, acciones de CI (versionadas).
-* **Reproducibilidad**: trabaja dentro de WSL para evitar sorpresas Win/Unix.
-* **Secretos**: nunca comprometer `.env`; usa `.env.example`.
-* **Espacio Docker**: planifica limpieza (`docker system prune`) para no saturar disco.
-* **Rendimiento**: monitoriza RAM/CPU asignados a WSL/Docker según crezca la base y el scraping/cargas.
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": { "source.fixAll.eslint": true },
+  "eslint.validate": ["typescript", "typescriptreact", "javascript"]
+}
+```
+
+(Está alineado con tu Fase 0 anterior y evita ruido en commits desde el primer día).&#x20;
+
+## 0.7 Checklist de salida (Fase 0 completada)
+
+* [ ] **Node LTS** + **pnpm** activos y verificados.&#x20;
+* [ ] **Git** configurado (`core.autocrlf input`, `core.longpaths true`).&#x20;
+* [ ] **Docker Desktop** con WSL2 OK; imagen **`postgres:16`** descargada.&#x20;
+* [ ] **VS Code** con extensiones clave.&#x20;
+* [ ] **`.env.example`** creado con `DATABASE_URL`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`.&#x20;
 
 ---
