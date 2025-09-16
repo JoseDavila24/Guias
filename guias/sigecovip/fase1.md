@@ -79,122 +79,151 @@ NODE_ENV="development"
 
 ```prisma
 generator client {
-  provider = "prisma-client-js"
+    provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
 }
 
-enum RolUsuario { INSPECTOR COORDINADOR }
+enum RolUsuario {
+    INSPECTOR
+    COORDINADOR
+}
 
-enum EstatusOperativo { VIGENTE IRREGULAR SANCIONADO EN_TRAMITE }
+enum EstatusOperativo {
+    VIGENTE
+    IRREGULAR
+    SANCIONADO
+    EN_TRAMITE
+}
 
-enum AccionAuditoria { ALTA BAJA MODIFICACION LOGIN REPORTE }
-enum ModuloAuditoria { COMERCIANTE INSPECCION REPORTE USUARIO }
+/**
+ * Recomendado: formalizar strings como enums
+ */
+enum FormatoReporte {
+    PDF
+    EXCEL
+    CSV
+}
+
+enum AccionAuditoria {
+    ALTA
+    BAJA
+    MODIFICACION
+    LOGIN
+    REPORTE
+}
+
+enum ModuloAuditoria {
+    COMERCIANTE
+    INSPECCION
+    REPORTE
+    USUARIO
+}
 
 model Usuario {
-  id            String       @id @default(uuid())
-  nombre        String
-  email         String       @unique @db.Citext // requiere extensión citext; si no la usas, quita @db.Citext
-  hashPassword  String
-  rol           RolUsuario
-  creadoEn      DateTime     @default(now())
-  actualizadoEn DateTime     @updatedAt
+    id            String     @id @default(uuid())
+    nombre        String
+    email         String     @unique
+    hashPassword  String
+    rol           RolUsuario
+    creadoEn      DateTime   @default(now())
+    actualizadoEn DateTime   @updatedAt
 
-  inspecciones  Inspeccion[] @relation("InspectorInspecciones")
-  reportes      Reporte[]    @relation("AutorReportes")
-  auditorias    Auditoria[]  @relation("AutorAuditorias")
+    inspecciones Inspeccion[] @relation("InspectorInspecciones")
+    reportes     Reporte[]    @relation("AutorReportes")
+    auditorias   Auditoria[]  @relation("AutorAuditorias")
+
+    @@index([email])
 }
 
 model Comerciante {
-  id                String               @id @default(uuid())
-  titularNombre     String
-  giro              String
-  superficieM2      Decimal              @db.Decimal(10,2)
-  diasOperacion     String
-  horarioOperacion  String
-  tipoMontaje       String
-  licenciaPermiso   String?
-  direccion         String
-  latitud           Decimal              @db.Decimal(9,6)
-  longitud          Decimal              @db.Decimal(9,6)
-  organizacion      String?
-  estatus           EstatusOperativo     @default(VIGENTE)
-  fotos             Json?
-  documentos        Json?
-  creadoEn          DateTime             @default(now())
-  actualizadoEn     DateTime             @updatedAt
+    id               String           @id @default(uuid())
+    titularNombre    String
+    giro             String
+    superficieM2     Decimal          @db.Decimal(10, 2) // precisión sugerida
+    diasOperacion    String
+    horarioOperacion String
+    tipoMontaje      String
+    licenciaPermiso  String?
+    direccion        String
+    latitud          Decimal          @db.Decimal(9, 6)
+    longitud         Decimal          @db.Decimal(9, 6)
+    organizacion     String?
+    estatus          EstatusOperativo
+    fotos            Json? // Arreglo de URLs
+    documentos       Json? // Arreglo de URLs
+    creadoEn         DateTime         @default(now())
+    actualizadoEn    DateTime         @updatedAt
 
-  inspecciones      Inspeccion[]
-  reportesIncluidos ReporteComerciante[]
+    inspecciones      Inspeccion[]
+    reportesIncluidos ReporteComerciante[]
 
-  @@index([estatus])
-  @@index([latitud, longitud])
-  // Opcional: evitar duplicados evidentes
-  // @@unique([titularNombre, direccion])
+    @@index([estatus])
+    @@index([organizacion])
+    @@index([latitud, longitud]) // útil para queries geográficas
 }
 
 model Inspeccion {
-  id            String      @id @default(uuid())
-  fechaHora     DateTime    @default(now())
-  notas         String
-  evidencias    Json?
-  comercianteId String
-  inspectorId   String
+    id            String   @id @default(uuid())
+    fechaHora     DateTime @default(now())
+    notas         String
+    evidencias    Json? // Arreglo de URLs
+    comercianteId String
+    inspectorId   String
 
-  comerciante   Comerciante @relation(fields: [comercianteId], references: [id], onDelete: Restrict)
-  inspector     Usuario     @relation("InspectorInspecciones", fields: [inspectorId], references: [id], onDelete: SetNull)
+    comerciante Comerciante @relation(fields: [comercianteId], references: [id], onDelete: Cascade)
+    inspector   Usuario     @relation("InspectorInspecciones", fields: [inspectorId], references: [id], onDelete: Restrict)
 
-  creadoEn      DateTime    @default(now())
-  actualizadoEn DateTime    @updatedAt
+    creadoEn DateTime @default(now())
 
-  @@index([comercianteId])
-  @@index([inspectorId])
-  @@index([fechaHora])
+    @@index([comercianteId])
+    @@index([inspectorId])
+    @@index([fechaHora])
 }
 
 model Reporte {
-  id              String              @id @default(uuid())
-  tipo            String
-  rangoFechas     String
-  formato         String              // "PDF" | "Excel" | "CSV"
-  fechaGeneracion DateTime            @default(now())
-  autorId         String
+    id              String         @id @default(uuid())
+    tipo            String
+    rangoFechas     String
+    formato         FormatoReporte // antes: String
+    fechaGeneracion DateTime       @default(now())
+    autorId         String
 
-  autor           Usuario             @relation("AutorReportes", fields: [autorId], references: [id], onDelete: SetNull)
-  incluye         ReporteComerciante[]
+    autor   Usuario              @relation("AutorReportes", fields: [autorId], references: [id], onDelete: Restrict)
+    incluye ReporteComerciante[]
 
-  creadoEn        DateTime            @default(now())
-  actualizadoEn   DateTime            @updatedAt
+    creadoEn DateTime @default(now())
 
-  @@index([autorId])
-  @@index([fechaGeneracion])
+    @@index([autorId, fechaGeneracion])
 }
 
-// Clave compuesta (sin id artificial)
 model ReporteComerciante {
-  reporteId     String
-  comercianteId String
+    id            String @id @default(uuid())
+    reporteId     String
+    comercianteId String
 
-  reporte       Reporte     @relation(fields: [reporteId], references: [id], onDelete: Cascade)
-  comerciante   Comerciante @relation(fields: [comercianteId], references: [id], onDelete: Cascade)
+    reporte     Reporte     @relation(fields: [reporteId], references: [id], onDelete: Cascade)
+    comerciante Comerciante @relation(fields: [comercianteId], references: [id], onDelete: Cascade)
 
-  @@id([reporteId, comercianteId])
+    @@unique([reporteId, comercianteId])
+    @@index([reporteId])
+    @@index([comercianteId])
 }
 
 model Auditoria {
-  id         String           @id @default(uuid())
-  usuarioId  String?
-  accion     AccionAuditoria
-  modulo     ModuloAuditoria
-  fechaHora  DateTime         @default(now())
-  detalle    String?
+    id        String          @id @default(uuid())
+    usuarioId String?
+    accion    AccionAuditoria // antes: String
+    modulo    ModuloAuditoria // antes: String
+    fechaHora DateTime        @default(now())
+    detalle   String?
 
-  autor      Usuario?         @relation("AutorAuditorias", fields: [usuarioId], references: [id], onDelete: SetNull)
+    autor Usuario? @relation("AutorAuditorias", fields: [usuarioId], references: [id], onDelete: SetNull)
 
-  @@index([usuarioId, fechaHora])
+    @@index([usuarioId, fechaHora])
 }
 ```
 
