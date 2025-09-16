@@ -41,10 +41,7 @@ Selecciona:
 
 ```powershell
 docker pull postgres:16
-docker run --name pg-sigecovip ^
-  -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=sigecovip ^
-  -p 5432:5432 -d postgres:16
-
+docker run --name pg-sigecovip -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=sigecovip -p 5432:5432 -d postgres:16
 docker ps -a
 ```
 
