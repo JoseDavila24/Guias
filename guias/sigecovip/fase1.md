@@ -1,35 +1,28 @@
-# Fase 1 — Inicialización “sin errores” (SIGECOVIP)
+# Fase 1 — App con login listo (ruta sencilla)
 
-## 1) Crear proyecto base (Create-T3-App)
+## 1) Crear el proyecto con T3 (App Router)
 
 ```powershell
 cd D:\Dev
 pnpm.cmd dlx create-t3-app@latest sigecovip
 ```
 
-Selecciona: **TypeScript**, **Tailwind**, **tRPC**, **Prisma**, **App Router**, **PostgreSQL**, **ESLint+Prettier**, **Init Git**, **Run pnpm install**, **@/**.
+Selecciona: **TypeScript**, **Tailwind**, **tRPC**, **Prisma**, **App Router**, **NextAuth**, **PostgreSQL**, **ESLint+Prettier**, **Init Git**, **Run pnpm install**, alias **@/**.
+(Esto encaja con el entorno y prácticas fijadas en tu Fase 0).&#x20;
 
-> Nota: si la plantilla ofrece NextAuth y aún no lo usarás, **no lo marques**; si lo marcas, no usaremos `protectedProcedure` en esta fase para evitar dependencias a tablas de auth.
-
----
-
-## 2) PostgreSQL 16 en Docker (una sola línea, Windows)
+## 2) PostgreSQL 16 en Docker (pin de versión)
 
 ```powershell
-docker run --name pg-sigecovip -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=sigecovip -p 5432:5432 -d postgres:16
+docker run --name pg-sigecovip `
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=sigecovip `
+  -p 5432:5432 -d postgres:16
 ```
 
-**Si 5432 ya está ocupado**, usa 5433:
-
-```powershell
-docker run --name pg-sigecovip -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=sigecovip -p 5433:5432 -d postgres:16
-```
-
----
+Si 5432 está ocupado, usa `-p 5433:5432` y ajusta la URL. (Pin de versión y checks tal como definiste antes).&#x20;
 
 ## 3) Variables de entorno
 
-**`sigecovip/.env`** (local, NO versionar):
+**`sigecovip/.env`** (local):
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sigecovip?schema=public"
@@ -38,9 +31,7 @@ NEXTAUTH_SECRET="cambia-esto-por-un-valor-largo-y-seguro"
 NODE_ENV="development"
 ```
 
-*Si usaste el puerto 5433, cambia `@localhost:5433`.*
-
-**`sigecovip/.env.example`** (SÍ versionar):
+**`sigecovip/.env.example`** (versionado, sin secretos):
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public"
@@ -49,326 +40,223 @@ NEXTAUTH_SECRET=""
 NODE_ENV="development"
 ```
 
----
+(Política de `.env.example` desde Fase 0/guía previa).
 
-## 4) Prisma `schema.prisma`
+## 4) Prisma: modelo mínimo de usuarios
 
-1. Copia en el archivo `sigecovip/prisma/schema.prisma`.
+Edita `prisma/schema.prisma` a algo mínimo y funcional (puedes ampliar luego):
 
 ```prisma
-generator client {
-    provider = "prisma-client-js"
-}
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
 
-datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
-}
+model User {
+  id            String   @id @default(uuid())
+  name          String?
+  email         String   @unique
+  passwordHash  String   // para Credentials
+  role          String   @default("INSPECTOR")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-enum RolUsuario {
-    INSPECTOR
-    COORDINADOR
-}
-
-enum EstatusOperativo {
-    VIGENTE
-    IRREGULAR
-    SANCIONADO
-    EN_TRAMITE
-}
-
-/**
- * Recomendado: formalizar strings como enums
- */
-enum FormatoReporte {
-    PDF
-    EXCEL
-    CSV
-}
-
-enum AccionAuditoria {
-    ALTA
-    BAJA
-    MODIFICACION
-    LOGIN
-    REPORTE
-}
-
-enum ModuloAuditoria {
-    COMERCIANTE
-    INSPECCION
-    REPORTE
-    USUARIO
-}
-
-model Usuario {
-    id            String     @id @default(uuid())
-    nombre        String
-    email         String     @unique
-    hashPassword  String
-    rol           RolUsuario
-    creadoEn      DateTime   @default(now())
-    actualizadoEn DateTime   @updatedAt
-
-    inspecciones Inspeccion[] @relation("InspectorInspecciones")
-    reportes     Reporte[]    @relation("AutorReportes")
-    auditorias   Auditoria[]  @relation("AutorAuditorias")
-
-    @@index([email])
-}
-
-model Comerciante {
-    id               String           @id @default(uuid())
-    titularNombre    String
-    giro             String
-    superficieM2     Decimal          @db.Decimal(10, 2) // precisión sugerida
-    diasOperacion    String
-    horarioOperacion String
-    tipoMontaje      String
-    licenciaPermiso  String?
-    direccion        String
-    latitud          Decimal          @db.Decimal(9, 6)
-    longitud         Decimal          @db.Decimal(9, 6)
-    organizacion     String?
-    estatus          EstatusOperativo
-    fotos            Json? // Arreglo de URLs
-    documentos       Json? // Arreglo de URLs
-    creadoEn         DateTime         @default(now())
-    actualizadoEn    DateTime         @updatedAt
-
-    inspecciones      Inspeccion[]
-    reportesIncluidos ReporteComerciante[]
-
-    @@index([estatus])
-    @@index([organizacion])
-    @@index([latitud, longitud]) // útil para queries geográficas
-}
-
-model Inspeccion {
-    id            String   @id @default(uuid())
-    fechaHora     DateTime @default(now())
-    notas         String
-    evidencias    Json? // Arreglo de URLs
-    comercianteId String
-    inspectorId   String
-
-    comerciante Comerciante @relation(fields: [comercianteId], references: [id], onDelete: Cascade)
-    inspector   Usuario     @relation("InspectorInspecciones", fields: [inspectorId], references: [id], onDelete: Restrict)
-
-    creadoEn DateTime @default(now())
-
-    @@index([comercianteId])
-    @@index([inspectorId])
-    @@index([fechaHora])
-}
-
-model Reporte {
-    id              String         @id @default(uuid())
-    tipo            String
-    rangoFechas     String
-    formato         FormatoReporte // antes: String
-    fechaGeneracion DateTime       @default(now())
-    autorId         String
-
-    autor   Usuario              @relation("AutorReportes", fields: [autorId], references: [id], onDelete: Restrict)
-    incluye ReporteComerciante[]
-
-    creadoEn DateTime @default(now())
-
-    @@index([autorId, fechaGeneracion])
-}
-
-model ReporteComerciante {
-    id            String @id @default(uuid())
-    reporteId     String
-    comercianteId String
-
-    reporte     Reporte     @relation(fields: [reporteId], references: [id], onDelete: Cascade)
-    comerciante Comerciante @relation(fields: [comercianteId], references: [id], onDelete: Cascade)
-
-    @@unique([reporteId, comercianteId])
-    @@index([reporteId])
-    @@index([comercianteId])
-}
-
-model Auditoria {
-    id        String          @id @default(uuid())
-    usuarioId String?
-    accion    AccionAuditoria // antes: String
-    modulo    ModuloAuditoria // antes: String
-    fechaHora DateTime        @default(now())
-    detalle   String?
-
-    autor Usuario? @relation("AutorAuditorias", fields: [usuarioId], references: [id], onDelete: SetNull)
-
-    @@index([usuarioId, fechaHora])
+  @@index([email])
 }
 ```
 
-3. Valida, genera y migra:
+Genera y migra:
 
 ```powershell
 pnpm.cmd prisma validate
 pnpm.cmd prisma generate
-pnpm.cmd prisma migrate dev --name init
+pnpm.cmd prisma migrate dev --name init_user
 ```
 
-> Estos comandos **no dependen** de routers ni de NextAuth. Si tu schema no incluye modelos de auth, no pasa nada: esta fase no los usa.
+(Valida/migra como en tu flujo estándar).&#x20;
 
----
+## 5) Seed: crear un usuario de prueba
 
-## 5) Scripts útiles (opcionales)
+Crea `prisma/seed.ts`:
+
+```ts
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
+const prisma = new PrismaClient();
+
+async function main() {
+  const email = "demo@sigecovip.local";
+  const password = "Demo.1234"; // cámbialo después
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  await prisma.user.upsert({
+    where: { email },
+    update: { passwordHash },
+    create: { email, name: "Usuario Demo", passwordHash, role: "INSPECTOR" },
+  });
+  console.log("Seed OK:", email, password);
+}
+
+main().finally(() => prisma.$disconnect());
+```
+
+Instala la dependencia y corre el seed:
+
+```powershell
+pnpm.cmd add -D ts-node @types/bcryptjs
+pnpm.cmd add bcryptjs
+```
 
 En `package.json`:
 
 ```json
-"scripts": {
-  "db:validate": "prisma validate",
-  "db:generate": "prisma generate",
-  "db:migrate": "prisma migrate dev",
-  "db:deploy": "prisma migrate deploy",
-  "lint": "next lint",
-  "format": "prettier --write ."
+"prisma": { "seed": "ts-node prisma/seed.ts" }
+```
+
+Ejecuta:
+
+```powershell
+pnpm.cmd prisma db seed
+```
+
+## 6) NextAuth (Credentials Provider) — App Router
+
+Crea `src/server/auth.ts` (config compartida):
+
+```ts
+import { PrismaClient } from "@prisma/client";
+import CredentialsProvider from "next-auth/providers/credentials";
+import type { NextAuthOptions } from "next-auth";
+import bcrypt from "bcryptjs";
+
+const prisma = new PrismaClient();
+
+export const authOptions: NextAuthOptions = {
+  session: { strategy: "jwt" },
+  providers: [
+    CredentialsProvider({
+      name: "Credenciales",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Contraseña", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+        const user = await prisma.user.findUnique({ where: { email: credentials.email } });
+        if (!user) return null;
+        const ok = await bcrypt.compare(credentials.password, user.passwordHash);
+        if (!ok) return null;
+        return { id: user.id, name: user.name ?? user.email, email: user.email };
+      },
+    }),
+  ],
+  pages: { signIn: "/login" },
+};
+```
+
+Crea el **route handler** para NextAuth en App Router: `src/app/api/auth/[...nextauth]/route.ts`
+
+```ts
+import NextAuth from "next-auth";
+import { authOptions } from "@/server/auth";
+
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };
+```
+
+## 7) Página de Login y acciones
+
+`src/app/login/page.tsx`:
+
+```tsx
+"use client";
+import { signIn } from "next-auth/react";
+import { useState } from "react";
+
+export default function LoginPage() {
+  const [email, setEmail] = useState(""); 
+  const [password, setPassword] = useState("");
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const res = await signIn("credentials", {
+      email, password, callbackUrl: "/dashboard", redirect: true,
+    });
+  }
+
+  return (
+    <div className="min-h-screen grid place-items-center">
+      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 p-6 rounded-2xl shadow">
+        <h1 className="text-xl font-semibold">Iniciar sesión</h1>
+        <input className="w-full border p-2 rounded" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} />
+        <input className="w-full border p-2 rounded" placeholder="Contraseña" type="password" value={password} onChange={e=>setPassword(e.target.value)} />
+        <button className="w-full p-2 rounded-2xl shadow">Entrar</button>
+      </form>
+    </div>
+  );
 }
 ```
 
----
+## 8) Rutas protegidas (middleware) + Dashboard
 
-## 6) tRPC — healthcheck **minimalista y desacoplado del esquema**
-
-> No usa `protectedProcedure`, no toca DB, no importa modelos. 100% seguro.
-
-Crea `src/server/api/routers/health.ts`:
+Crea `src/middleware.ts`:
 
 ```ts
-import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
-
-export const healthRouter = createTRPCRouter({
-  ping: publicProcedure.query(() => ({ ok: true, ts: Date.now() })),
-});
+export { default } from "next-auth/middleware";
+export const config = { matcher: ["/dashboard/:path*"] };
 ```
 
-Regístralo en `src/server/api/root.ts`:
+Crea `src/app/dashboard/page.tsx`:
 
-```ts
-import { createTRPCRouter } from "@/server/api/trpc";
-import { healthRouter } from "./routers/health";
+```tsx
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/server/auth";
+import Link from "next/link";
 
-export const appRouter = createTRPCRouter({
-  health: healthRouter,
-});
-export type AppRouter = typeof appRouter;
-```
-
-Levanta dev y verifica:
-
-```powershell
-pnpm.cmd dev
-```
-
-En el panel de tRPC deberías ver `health.ping` respondiendo `{ ok: true, ts: ... }`.
-
----
-
-## 7) Husky + lint-staged en **Windows** (fix definitivo)
-
-> Evita el error “`lint-staged` no se reconoce…” usando `pnpm exec` y LF en el hook.
-
-1. Instala:
-
-```powershell
-pnpm.cmd add -D husky lint-staged eslint prettier
-```
-
-2. Inicializa Husky:
-
-```powershell
-pnpm.cmd dlx husky-init
-pnpm.cmd install
-```
-
-3. En `package.json`, añade:
-
-```json
-"lint-staged": {
-  "*.{js,ts,tsx}": ["eslint --fix", "prettier --write"],
-  "*.{json,md,css,scss}": ["prettier --write"]
+export default async function Dashboard() {
+  const session = await getServerSession(authOptions);
+  return (
+    <main className="p-6 space-y-4">
+      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <p>Hola, {session?.user?.name ?? session?.user?.email}.</p>
+      <Link href="/api/auth/signout">Cerrar sesión</Link>
+    </main>
+  );
 }
 ```
 
-4. Reemplaza `.husky/pre-commit` por EXACTAMENTE:
+> Con esto:
+> • `/login` permite entrar con el usuario seed.
+> • `/dashboard` exige sesión (middleware).
+> • Puedes añadir enlaces de `signIn/signOut` en tu layout cuando quieras.
 
-```sh
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
+## 9) tRPC “health” (opcional, para comprobar vida)
 
-pnpm exec lint-staged
-```
+Tal cual tu guía previa: crea un router `health.ping` y revisa en el panel de tRPC que responde. (Desacoplado de DB; útil para sanity-check).&#x20;
 
-5. Asegura finales de línea LF en el hook:
-
-```powershell
-git config --global core.autocrlf input
-```
-
-6. Prueba:
+## 10) Ejecutar todo
 
 ```powershell
-pnpm.cmd exec lint-staged --version
-git add -A
-git commit -m "test: husky ok"
-```
+# DB en docker (si no está ya)
+docker start pg-sigecovip
 
----
-
-## 8) Verificaciones rápidas (solo si aplica)
-
-* **Puerto en uso** (5432/5433):
-
-```powershell
-netstat -a -n -o | findstr :5432
-```
-
-Si ocupado → usa la variante 5433 y ajusta `DATABASE_URL`.
-
-* **Contenedor sano**:
-
-```powershell
-docker ps -a
-docker logs pg-sigecovip --tail=50
-```
-
-* **Conexión a la DB**:
-
-```powershell
-docker exec -it pg-sigecovip psql -U postgres -d sigecovip -c "select 1;"
-```
-
-* **Prisma listo**:
-
-```powershell
+# Prisma y seed
 pnpm.cmd prisma validate
 pnpm.cmd prisma generate
-pnpm.cmd prisma migrate dev --name init
-```
+pnpm.cmd prisma migrate dev --name init_user
+pnpm.cmd prisma db seed
 
-* **App arriba y tRPC OK**:
-
-```powershell
+# App
 pnpm.cmd dev
 ```
 
-Abre la app, revisa `health.ping`.
+Visita `http://localhost:3000/login`, entra con `demo@sigecovip.local` / `Demo.1234` y verifica `/dashboard`.
 
----
+## 11) Checklist de salida (Fase 1)
 
-## 9) Checklist de salida (Fase 1)
-
-* [ ] Contenedor `pg-sigecovip` (`postgres:16`) corriendo en el puerto correcto.
-* [ ] `.env` local correcto y **`.env.example`** versionado (sin secretos).
-* [ ] Prisma `validate/generate/migrate` ejecutados **sobre tu schema** sin errores.
-* [ ] tRPC **health** responde OK (sin depender de DB).
-* [ ] Husky **pre-commit** corre `pnpm exec lint-staged` sin fallos en Windows.
-* [ ] La app levanta con `pnpm dev` sin errores complejos.
+* [ ] Contenedor `postgres:16` corriendo y accesible (5432/5433).&#x20;
+* [ ] `.env` correcto y **`.env.example`** versionado (sin secretos).&#x20;
+* [ ] `prisma migrate` + `db seed` OK y `User` creado.&#x20;
+* [ ] **NextAuth Credentials** operando, `/login` → `/dashboard`.
+* [ ] **Middleware** protegiendo `/dashboard`.
+* [ ] (Opcional) tRPC `health.ping` responde OK.&#x20;
 
 ---
