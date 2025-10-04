@@ -1,230 +1,209 @@
-# Guía de Implementación de Correo Corporativo Activo con Exchange Server sobre Windows Server
+# **Guía de Implementación de Correo Corporativo Pasivo en Ubuntu Server**
 
-**Materia:** Sistemas Operativos y Redes
-**Práctica:** Implementación de correo corporativo activo con Exchange Server
-**Fecha de entrega:** **30 de octubre**
-**Topología:** 2 máquinas virtuales (Servidor y Cliente)
+## 1. Introducción
 
----
+El presente documento describe el procedimiento para implementar un **sistema de correo corporativo pasivo** sobre **Ubuntu Server**, utilizando **Postfix** como *Mail Transfer Agent (MTA)* y **Dovecot** como *Mail Delivery Agent (MDA)*.
+El objetivo es que los estudiantes configuren un entorno práctico que permita el envío y recepción de correos internos bajo un dominio ficticio, aplicando conocimientos de administración de sistemas y redes.
 
-## 1. Objetivo
-
-Implementar un sistema de **correo corporativo activo** basado en **Microsoft Exchange Server 2019/SE** sobre **Windows Server**, integrando los servicios de **Active Directory (AD DS), DNS y DHCP**, en un entorno de laboratorio aislado.
-Se validará el envío y recepción de correos internos mediante **OWA (Outlook Web App)** y un cliente Windows unido al dominio.
+📅 **Fecha límite de entrega:** 30 de octubre.
+🔹 **Modalidad:** práctica individual con evidencia de pruebas.
 
 ---
 
-## 2. Topología de Laboratorio
+## 2. Componentes del Sistema de Correo
 
-### 2.1 Descripción de las máquinas virtuales
+1. **MTA (Mail Transfer Agent):** Se encarga de enviar y recibir correos electrónicos entre servidores. En este proyecto se usará **Postfix**.
+2. **MDA (Mail Delivery Agent):** Entrega los correos en los buzones de usuario. Se utilizará **Dovecot**.
+3. **MUA (Mail User Agent):** Cliente de correo usado por los usuarios finales (ejemplo: Thunderbird o mutt).
 
-* **VM1 – Servidor**
-
-  * SO: Windows Server 2019/2022
-  * Roles: AD DS, DNS, DHCP, Exchange Server (Mailbox)
-  * Nombre: `DC-EX01`
-  * IP: `192.168.10.20` (estática)
-  * Dominio: `JPL.lab`
-
-* **VM2 – Cliente**
-
-  * SO: Windows 7
-  * Rol: Cliente de pruebas unido al dominio
-  * Nombre: `WIN7CL`
-  * IP: Asignada por DHCP
-  * Unión al dominio: `JPL.lab`
-
-* **Red de laboratorio:** `192.168.10.0/24`
-
-  * Gateway ficticio: `192.168.10.1` (no es necesario acceso a Internet)
+📌 Ejemplo de flujo:
+Usuario A (MUA) → Postfix (MTA) → Dovecot (MDA) → Usuario B (MUA).
 
 ---
 
-## 3. Explicación de los Servicios
+## 3. Preparación del Entorno
 
-* **DHCP:** Asigna dinámicamente direcciones IP a los clientes.
-* **DNS:** Traduce nombres de dominio a direcciones IP; crítico para AD y Exchange.
-* **Active Directory (AD DS):** Base de datos de usuarios, equipos y políticas de dominio.
-* **Exchange Server:** Plataforma de correo electrónico y colaboración.
+### 3.1. Requisitos
 
----
+* Servidor con **Ubuntu Server 22.04 LTS** o superior.
+* Conectividad de red activa.
+* Acceso con privilegios de administrador (usuario con `sudo`).
 
-## 4. Instalación y Configuración del Servidor (VM1)
+### 3.2. Actualización del sistema
 
-### 4.1 Configuración de red estática
-
-```powershell
-New-NetIPAddress -InterfaceAlias "Ethernet0" -IPAddress 192.168.10.20 -PrefixLength 24 -DefaultGateway 192.168.10.1
-Set-DnsClientServerAddress -InterfaceAlias "Ethernet0" -ServerAddresses 192.168.10.20
-```
-
-### 4.2 Instalación de AD DS y DNS
-
-```powershell
-Install-WindowsFeature AD-Domain-Services, DNS -IncludeManagementTools
-Install-ADDSForest -DomainName "JPL.lab" -DomainNetbiosName "JPL" -InstallDns
-```
-
-> El servidor se reiniciará como **Controlador de Dominio**.
-
-### 4.3 Instalación de DHCP
-
-```powershell
-Install-WindowsFeature DHCP -IncludeManagementTools
-Add-DhcpServerInDC -DnsName "DC-EX01.JPL.lab" -IpAddress 192.168.10.20
-```
-
-Crear un **scope**:
-
-```powershell
-Add-DhcpServerv4Scope -Name "ScopeJPL" -StartRange 192.168.10.50 -EndRange 192.168.10.100 -SubnetMask 255.255.255.0 -State Active
-Set-DhcpServerv4OptionValue -OptionId 3 -Value 192.168.10.1
-Set-DhcpServerv4OptionValue -OptionId 6 -Value 192.168.10.20
-Set-DhcpServerv4OptionValue -OptionId 15 -Value "JPL.lab"
-```
-
-### 4.4 Preparación de DNS para Exchange
-
-Crear zona interna `JPL.lab` con registros:
-
-* `mail.JPL.lab` → `192.168.10.20` (A)
-* `autodiscover.JPL.lab` → `mail.JPL.lab` (CNAME)
-
-```powershell
-Add-DnsServerResourceRecordA -Name "mail" -ZoneName "JPL.lab" -IPv4Address 192.168.10.20
-Add-DnsServerResourceRecordCName -Name "autodiscover" -HostNameAlias "mail.JPL.lab" -ZoneName "JPL.lab"
+```bash
+sudo apt update && sudo apt upgrade -y
 ```
 
 ---
 
-## 5. Instalación de Exchange Server
+## 4. Instalación y Configuración del Servidor de Correo
 
-### 5.1 Prerrequisitos
+### 4.1. Instalación de Postfix y Dovecot
 
-```powershell
-Install-WindowsFeature NET-Framework-45-Features, RSAT-ADDS, Web-Server, Web-Mgmt-Console, WAS-Process-Model, RSAT-ADDS -IncludeManagementTools
+```bash
+sudo apt install postfix dovecot-imapd dovecot-pop3d -y
 ```
 
-### 5.2 Preparación de Active Directory
+Durante la instalación de Postfix:
 
-Desde el instalador de Exchange:
+* Seleccionar **Internet Site**.
+* Nombre del correo del sistema: `JPL.com` (usar iniciales del alumno).
 
-```powershell
-Setup.exe /PrepareSchema /IAcceptExchangeServerLicenseTerms_DiagnosticDataOFF
-Setup.exe /PrepareAD /OrganizationName:"JPLOrg" /IAcceptExchangeServerLicenseTerms_DiagnosticDataOFF
-Setup.exe /PrepareAllDomains /IAcceptExchangeServerLicenseTerms_DiagnosticDataOFF
+### 4.2. Configuración de Postfix
+
+Archivo principal: `/etc/postfix/main.cf`
+
+```bash
+sudo nano /etc/postfix/main.cf
 ```
 
-### 5.3 Instalación del rol Mailbox
+Configurar los siguientes parámetros básicos:
 
-```powershell
-Setup.exe /Mode:Install /Roles:Mailbox /IAcceptExchangeServerLicenseTerms_DiagnosticDataOFF
+```
+myhostname = mail.JPL.com
+mydomain = JPL.com
+myorigin = /etc/mailname
+mydestination = $myhostname, localhost.$mydomain, localhost, $mydomain
+relayhost =
+inet_interfaces = all
+inet_protocols = ipv4
+home_mailbox = Maildir/
+```
+
+Guardar y reiniciar:
+
+```bash
+sudo systemctl restart postfix
+```
+
+### 4.3. Configuración de Dovecot
+
+Archivo principal: `/etc/dovecot/dovecot.conf`
+
+```bash
+sudo nano /etc/dovecot/dovecot.conf
+```
+
+Agregar/modificar:
+
+```
+protocols = imap pop3
+```
+
+Configurar buzones en `/etc/dovecot/conf.d/10-mail.conf`:
+
+```
+mail_location = maildir:~/Maildir
+```
+
+Habilitar autenticación en `/etc/dovecot/conf.d/10-auth.conf`:
+
+```
+disable_plaintext_auth = no
+auth_mechanisms = plain login
+```
+
+Reiniciar servicio:
+
+```bash
+sudo systemctl restart dovecot
 ```
 
 ---
 
-## 6. Configuración de Exchange
+## 5. Creación de Cuentas de Correo
 
-### 6.1 Dominios aceptados
+Crear al menos dos usuarios del sistema que representarán las cuentas de correo:
 
-```powershell
-New-AcceptedDomain -Name "JPL" -DomainName "JPL.lab" -DomainType Authoritative
+```bash
+sudo adduser juan
+sudo adduser maria
 ```
 
-### 6.2 Políticas de direcciones de correo
+Generar estructura de buzones:
 
-```powershell
-Set-EmailAddressPolicy "Default Policy" -EnabledEmailAddressTemplates "SMTP:%g.%s@JPL.lab"
-```
-
-### 6.3 Creación de buzones de prueba
-
-```powershell
-New-Mailbox -Name "Usuario1" -UserPrincipalName usuario1@JPL.lab -Password (ConvertTo-SecureString "P@ssw0rd!" -AsPlainText -Force)
-New-Mailbox -Name "Usuario2" -UserPrincipalName usuario2@JPL.lab -Password (ConvertTo-SecureString "P@ssw0rd!" -AsPlainText -Force)
+```bash
+sudo mkdir /home/juan/Maildir
+sudo mkdir /home/maria/Maildir
+sudo chown -R juan:juan /home/juan/Maildir
+sudo chown -R maria:maria /home/maria/Maildir
 ```
 
 ---
 
-## 7. Configuración del Cliente (VM2)
+## 6. Instalación y Configuración del Cliente de Correo (MUA)
 
-### 7.1 Unión al dominio
+### 6.1. Thunderbird (Windows/Linux)
 
-En Windows 7:
-**Panel de Control → Sistema → Cambiar configuración → Nombre de equipo → Dominio → JPL.lab**
+* Instalar **Thunderbird** en el sistema cliente.
+* Crear una nueva cuenta:
 
-Reiniciar y loguear como `JPL\usuario1`.
+  * Nombre: Juan Pérez
+  * Correo: `juan@JPL.com`
+  * Servidor entrante: `mail.JPL.com` (IMAP o POP3, puerto 143/110)
+  * Servidor saliente (SMTP): `mail.JPL.com` (puerto 25)
+  * Usuario: nombre de usuario del sistema (ej. `juan`).
 
-### 7.2 Acceso a OWA
-
-Abrir navegador y entrar en:
-
-```
-https://mail.JPL.lab/owa
-```
-
-Aceptar el certificado autofirmado y probar login con `usuario1@JPL.lab`.
+Repetir el procedimiento para el usuario `maria@JPL.com`.
 
 ---
 
-## 8. Pruebas y Validación
+## 7. Pruebas y Validación
 
-### 8.1 Conectividad
+### 7.1. Pruebas de red y resolución de nombres
 
-```powershell
-ping mail.JPL.lab
-Test-NetConnection mail.JPL.lab -Port 443
+```bash
+ping mail.JPL.com
+nslookup mail.JPL.com
 ```
 
-### 8.2 DNS
+### 7.2. Pruebas de conectividad a puertos
 
-```cmd
-nslookup mail.JPL.lab
-nslookup autodiscover.JPL.lab
+```bash
+telnet mail.JPL.com 25   # SMTP
+telnet mail.JPL.com 110  # POP3
+telnet mail.JPL.com 143  # IMAP
 ```
 
-### 8.3 Exchange
+### 7.3. Pruebas de envío y recepción
 
-```powershell
-Test-ServiceHealth
-Test-Mailflow
-```
+1. Desde Thunderbird de `juan@JPL.com`, enviar correo a `maria@JPL.com`.
+2. Verificar recepción en la bandeja de María.
+3. Responder el mensaje desde la cuenta de María a Juan.
 
-### 8.4 Prueba práctica
-
-* Ingresar a OWA con `usuario1` y enviar correo a `usuario2`.
-* Confirmar recepción y contestar.
+📌 Evidencia esperada: capturas de pantalla mostrando el envío, recepción y encabezados de los correos.
 
 ---
 
-## 9. Buenas Prácticas de Laboratorio
+## 8. Buenas Prácticas Mínimas
 
-* No deshabilitar IPv6.
-* Instalar últimos Cumulative Updates de Exchange.
-* Evitar relé SMTP abierto.
-* Configurar exclusiones antivirus recomendadas por Microsoft.
-* Usar cuentas con mínimo privilegio para administración.
+* **Seguridad:**
+
+  * Deshabilitar el acceso anónimo.
+  * Habilitar TLS (STARTTLS) si se busca producción.
+
+* **Logs:**
+  Revisar registros para diagnóstico:
+
+  ```bash
+  tail -f /var/log/mail.log
+  ```
+
+* **Colas de correo:**
+  Verificar con:
+
+  ```bash
+  mailq
+  ```
+
+* **Mantenimiento:**
+  Mantener el sistema actualizado y limpiar colas periódicamente.
 
 ---
 
-## 10. Checklist Final
+## 9. Conclusiones
 
-* [ ] Windows Server con IP fija configurada.
-* [ ] AD DS, DNS y DHCP instalados y configurados.
-* [ ] Zona DNS con registros `mail` y `autodiscover`.
-* [ ] Exchange Server instalado (rol Mailbox).
-* [ ] Dominios aceptados y política de direcciones configurados.
-* [ ] 2 buzones de prueba creados.
-* [ ] Windows 7 unido al dominio.
-* [ ] Acceso a OWA y prueba de correo realizada.
-* [ ] Validaciones con `ping`, `nslookup`, `Test-Mailflow` realizadas.
+Este laboratorio permite a los estudiantes comprender los fundamentos de un sistema de correo electrónico corporativo, diferenciando los roles del MTA, MDA y MUA, así como la importancia de la correcta configuración de red, autenticación y pruebas de conectividad.
 
 ---
-
-## 11. Cronograma de Entrega
-
-* **Semana 1:** Configuración de VM1 (AD DS, DNS, DHCP).
-* **Semana 2:** Instalación de Exchange Server.
-* **Semana 3:** Configuración de buzones y unión de cliente Windows 7.
-* **Semana 4:** Validaciones y entrega del informe con capturas.
-* **Fecha límite:** **30 de octubre**.
