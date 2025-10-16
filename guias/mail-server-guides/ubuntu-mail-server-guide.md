@@ -1,106 +1,55 @@
-# **Guía Completa: Implementación de Sistema de Correo Corporativo Pasivo en Ubuntu Server**
+## 🧭 Paso 0 — Nombres y dominio que usaremos
+
+* **Dominio interno:** `jmrd.com`
+* **Hostname del servidor:** `mail.jmrd.com` (apuntando a **172.21.45.102**)
+
+> Si cambias el dominio, reemplázalo en los comandos.
 
 ---
 
-## **📋 Tabla de Contenidos**
+## 1) Preparar resolución de nombres
 
-1. [Introducción](#1-introducción)
-2. [Arquitectura del Sistema](#2-arquitectura-del-sistema)
-3. [Configuración del Servidor](#3-configuración-del-servidor)
-4. [Configuración de Clientes](#4-configuración-de-clientes)
-5. [Sistema de Correo Pasivo](#5-sistema-de-correo-pasivo)
-6. [Evidencia de Funcionamiento](#6-evidencia-de-funcionamiento)
-7. [Anexos Técnicos](#7-anexos-técnicos)
-8. [Conclusión](#8-conclusión)
+### 1.1. En **Windows** (donde usarás Thunderbird)
 
----
-
-## **1. INTRODUCCIÓN**
-
-### **1.1 Objetivo**
-
-Implementar un **sistema de correo corporativo pasivo** sobre **Ubuntu Server 24.04 LTS**, utilizando **Postfix** como *Mail Transfer Agent (MTA)* y **Dovecot** como *Mail Delivery Agent (MDA)*, bajo el dominio corporativo **jmrd.com**.
-
-### **1.2 Alcance**
-
-* ✅ Correo interno corporativo
-* ✅ Autenticación de usuarios locales
-* ✅ Almacenamiento en buzones Maildir
-* ✅ Acceso mediante cliente Thunderbird
-* ❌ Comunicación con dominios externos
-* ❌ Resolución DNS MX externa
-
-### **1.3 Especificaciones Técnicas**
-
-| Elemento           | Descripción             |
-| ------------------ | ----------------------- |
-| **Servidor**       | Ubuntu Server 24.04 LTS |
-| **Virtualización** | Multipass con Hyper-V   |
-| **Dirección IP**   | 172.19.69.99            |
-| **Dominio**        | jmrd.com                |
-| **Usuarios**       | juan, maria             |
-
----
-
-## **2. ARQUITECTURA DEL SISTEMA**
-
-### **2.1 Diagrama de Arquitectura**
+Abrir el bloc de notas **como Administrador** y editar:
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Thunderbird   │ ── │   Dovecot IMAP   │ ── │   Buzones       │
-│   (Cliente)     │    │   (Recepción)    │    │   Maildir       │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-         │                        │                        │
-         └────────────────────────┼────────────────────────┘
-                                  │
-                         ┌──────────────────┐
-                         │   Postfix SMTP   │
-                         │   (Envío Local)  │
-                         └──────────────────┘
+C:\Windows\System32\drivers\etc\hosts
 ```
 
-### **2.2 Componentes Implementados**
+Añade esta línea y guarda:
 
-| Componente      | Función                   | Estado         |
-| --------------- | ------------------------- | -------------- |
-| **Postfix**     | MTA – Envío SMTP          | ⚙️ Configurado |
-| **Dovecot**     | MDA – Recepción IMAP/POP3 | ✅ Operativo    |
-| **Thunderbird** | MUA – Cliente de correo   | ✅ Conectado    |
-| **Multipass**   | Virtualización            | ✅ Operativo    |
-
----
-
-## **3. CONFIGURACIÓN DEL SERVIDOR**
-
-### **3.1 Entorno Multipass**
-
-```bash
-multipass launch 24.04 --name correo --cpus 2 --memory 2G --disk 10G
-multipass info correo
+```
+172.21.45.102   mail.jmrd.com
 ```
 
-**Ejemplo de salida:**
-`Name: correo | State: Running | IPv4: 172.19.69.99`
+### 1.2. En la **VM** (Multipass)
 
----
-
-### **3.2 Configuración Básica del Sistema**
+Entra a la VM y configura hostname y `/etc/hosts`:
 
 ```bash
 multipass shell correo
+
+# Hostname/FQDN
 sudo hostnamectl set-hostname mail.jmrd.com
-sudo nano /etc/hosts
-# 172.19.69.99 mail.jmrd.com mail localhost
+echo jmrd.com | sudo tee /etc/mailname
+
+# /etc/hosts (NO mezclar localhost con la IP de la VM)
+sudo bash -c 'cat >/etc/hosts <<EOF
+127.0.0.1   localhost
+172.21.45.102 mail.jmrd.com mail
+EOF'
 ```
+
+> Corregimos el error típico de poner `localhost` en la misma línea de la IP del servidor. 
 
 ---
 
-### **3.3 Instalación de Servicios**
+## 2) Instalar paquetes mínimos
 
 ```bash
-sudo apt update && sudo apt upgrade -y
-sudo apt install postfix dovecot-imapd dovecot-pop3d bsd-mailx mailutils -y
+sudo apt update && sudo apt -y upgrade
+sudo apt -y install postfix dovecot-imapd mailutils
 ```
 
 Durante la instalación de **Postfix**:
@@ -110,67 +59,122 @@ Durante la instalación de **Postfix**:
 
 ---
 
-### **3.4 Configuración de Postfix**
+## 3) Postfix (SMTP) — configuración base + envío autenticado (587)
 
-**Archivo:** `/etc/postfix/main.cf`
+Edita `/etc/postfix/main.cf` y deja al menos esto:
 
-```bash
+```ini
+# Identidad
 myhostname = mail.jmrd.com
 mydomain = jmrd.com
 myorigin = /etc/mailname
 mydestination = $myhostname, $mydomain, localhost.$mydomain, localhost
 
-mynetworks = 127.0.0.0/8 172.19.0.0/16 [::1]/128
-smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination
-
+# Red / protocolos
 inet_interfaces = all
 inet_protocols = ipv4
+
+# Buzones en formato Maildir
 home_mailbox = Maildir/
 
-local_recipient_maps = unix:passwd.byname $alias_maps
+# Mapas de alias
 alias_maps = hash:/etc/aliases
+alias_database = hash:/etc/aliases
+
+# TLS (usar certificados "snakeoil" por simplicidad)
+smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem
+smtpd_tls_key_file  = /etc/ssl/private/ssl-cert-snakeoil.key
+smtpd_tls_security_level = may
+smtp_tls_security_level  = may
+
+# SASL con Dovecot (para SMTP AUTH en puerto 587)
+smtpd_sasl_type = dovecot
+smtpd_sasl_path = private/auth
+smtpd_sasl_auth_enable = yes
+smtpd_sasl_security_options = noanonymous
+
+# Reglas de relé (no ser open relay)
+smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination
 ```
 
-**Verificación:**
+Activa el servicio **submission (587)** con TLS obligatorio y AUTH:
+
+```bash
+sudo postconf -M submission/inet='submission inet n - y - - smtpd'
+sudo postconf -P 'submission/inet/syslog_name=postfix/submission'
+sudo postconf -P 'submission/inet/smtpd_tls_security_level=encrypt'
+sudo postconf -P 'submission/inet/smtpd_sasl_auth_enable=yes'
+sudo postconf -P 'submission/inet/milter_macro_daemon_name=ORIGINATING'
+```
+
+> Añadimos también `alias_database` y reforzamos el relé con `smtpd_relay_restrictions`. 
+
+Aplica cambios:
 
 ```bash
 sudo newaliases
-sudo postfix reload
-sudo postconf -n
+sudo systemctl restart postfix
+sudo postconf -n | sed -n '1,200p'
 ```
 
 ---
 
-### **3.5 Configuración de Dovecot**
+## 4) Dovecot (IMAP) — Maildir + TLS + socket para Postfix
 
-**Archivo:** `/etc/dovecot/conf.d/10-mail.conf`
+### 4.1. Ubicación de buzones
 
-```conf
-mail_location = maildir:~/Maildir
+```
+sudo sed -i 's|^#\?mail_location.*|mail_location = maildir:~/Maildir|' /etc/dovecot/conf.d/10-mail.conf
 ```
 
-**Archivo:** `/etc/dovecot/conf.d/10-auth.conf`
+### 4.2. Autenticación segura
 
-```conf
-disable_plaintext_auth = no
-auth_mechanisms = plain login
+```
+sudo sed -i 's/^#\?disable_plaintext_auth.*/disable_plaintext_auth = yes/' /etc/dovecot/conf.d/10-auth.conf
+sudo sed -i 's/^#\?auth_mechanisms.*/auth_mechanisms = plain login/' /etc/dovecot/conf.d/10-auth.conf
 ```
 
-**Verificación:**
+### 4.3. SSL/TLS
+
+```
+sudo sed -i 's/^#\?ssl = .*/ssl = yes/' /etc/dovecot/conf.d/10-ssl.conf
+sudo sed -i 's|^#\?ssl_cert =.*|ssl_cert = </etc/ssl/certs/ssl-cert-snakeoil.pem|' /etc/dovecot/conf.d/10-ssl.conf
+sudo sed -i 's|^#\?ssl_key =.*|ssl_key = </etc/ssl/private/ssl-cert-snakeoil.key|' /etc/dovecot/conf.d/10-ssl.conf
+```
+
+### 4.4. Socket SASL para Postfix (imprescindible para AUTH)
+
+Abre `/etc/dovecot/conf.d/10-master.conf` y asegúrate de **descomentar/añadir**:
+
+```conf
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}
+```
+
+Aplica cambios y verifica:
 
 ```bash
-sudo doveconf -n
 sudo systemctl restart dovecot
+sudo doveconf -n | sed -n '1,200p'
 ```
+
+> En tu guía original se utilizaba autenticación en texto plano “para taller”; aquí activamos STARTTLS y dejamos AUTH seguro como camino principal. 
 
 ---
 
-### **3.6 Creación de Usuarios Corporativos**
+## 5) Usuarios y Maildir
 
 ```bash
+# Crea usuarios
 sudo adduser juan
 sudo adduser maria
 
+# Crea Maildir con permisos correctos
 sudo -u juan  maildirmake.dovecot ~/Maildir
 sudo -u maria maildirmake.dovecot ~/Maildir
 sudo chmod -R 700 /home/*/Maildir
@@ -178,23 +182,13 @@ sudo chmod -R 700 /home/*/Maildir
 
 ---
 
-### **3.7 Verificación Final de Servicios**
+## 6) Alias internos (incluye postmaster/root)
 
-```bash
-sudo systemctl status postfix
-sudo systemctl status dovecot
-sudo ss -tulpn | grep -E ':25|:110|:143'
-sudo doveadm auth test juan
-sudo doveadm auth test maria
-```
-
----
-
-### **3.8 Creación de Grupos de Correo (Listas Internas de Aviso)**
-
-**Archivo:** `/etc/aliases`
+Edita `/etc/aliases` y añade (además de tus grupos):
 
 ```
+postmaster: juan
+root: juan
 avisos: juan, maria
 soporte: juan
 direccion: maria
@@ -205,223 +199,135 @@ sudo newaliases
 sudo postfix reload
 ```
 
-**Prueba:**
+> Redirigir `postmaster` y `root` a un buzón real es buena práctica y requerido por estándares. 
+
+---
+
+## 7) Pruebas rápidas en servidor
 
 ```bash
-echo "Mensaje de prueba" | mail -s "Aviso Interno" avisos@jmrd.com
-sudo tail -f /var/log/mail.log | grep avisos
+# Servicios y puertos
+systemctl --no-pager status postfix dovecot
+ss -lntp | grep -E ':25|:143|:587'
+
+# Autenticación Dovecot
+sudo doveadm auth test juan
+sudo doveadm auth test maria
+
+# Entrega local
+printf "Subject: Test Local\n\nHola Maria\n" | sendmail -v maria@jmrd.com
+sudo tail -n 80 /var/log/mail.log | tail
+```
+
+*Opcional TLS SMTP:*
+
+```bash
+# Comprobar que 587 acepta STARTTLS y AUTH
+nc -vz mail.jmrd.com 587
 ```
 
 ---
 
-## **4. CONFIGURACIÓN DE CLIENTES**
+## 8) Configurar Thunderbird (en Windows)
 
-### **4.1 Thunderbird – Configuración Exitosa (Paso a Paso)**
+**Cuenta IMAP (recomendada):**
 
-#### **1. Preparación en el cliente**
-
-* Asegúrate de poder hacer ping:
-
-  ```bash
-  ping mail.jmrd.com
-  ```
-* Verifica conectividad:
-
-  ```bash
-  telnet mail.jmrd.com 143
-  telnet mail.jmrd.com 25
-  ```
-
-#### **2. Alta de cuenta**
-
-1. Abre **Thunderbird** → **☰ → Nueva → Cuenta de correo existente**.
-2. Datos:
-
-   * **Nombre:** Juan Pérez
-   * **Correo:** [juan@jmrd.com](mailto:juan@jmrd.com)
-   * **Contraseña:** (la definida al crear el usuario)
-3. Pulsa **Continuar → Configuración manual**.
-
-#### **3. Configuración manual recomendada**
+* **Nombre:** Juan Pérez
+* **Correo:** `juan@jmrd.com`
+* **Contraseña:** (la de `juan`)
+* Ir a **Configuración manual** y usa:
 
 | Parámetro     | Entrante (IMAP)   | Saliente (SMTP)   |
 | ------------- | ----------------- | ----------------- |
 | Servidor      | mail.jmrd.com     | mail.jmrd.com     |
-| Puerto        | 143               | 25                |
-| Seguridad     | Ninguna           | Ninguna           |
-| Autenticación | Contraseña normal | Sin autenticación |
+| Puerto        | **143**           | **587**           |
+| Seguridad     | **STARTTLS**      | **STARTTLS**      |
+| Autenticación | Contraseña normal | Contraseña normal |
 | Usuario       | juan              | juan              |
 
-Pulsa **Reprobar** y luego **Hecho**.
+**Probar:**
 
-> 📘 Si activas SMTP AUTH en el futuro, usa puerto **587** y “Contraseña normal”.
+* Desde `juan@jmrd.com`, envía a `maria@jmrd.com`.
+* Revisa INBOX de María.
+* En el servidor, valida:
 
----
+  ```bash
+  sudo tail -n 50 /var/log/mail.log | grep maria
+  ```
 
-#### **4. Ajustes de recepción**
-
-* Configuración de la cuenta → **Sincronización y almacenamiento**:
-
-  * ✅ Comprobar mensajes cada **1 minuto**.
-  * ✅ Permitir conexión mantenida (IDLE).
-* Click derecho sobre la cuenta → **Suscribirse…** → marca **INBOX**.
-* Desactiva temporalmente el filtro de correo no deseado.
+> Nota: “From:” mostrará `usuario@jmrd.com`; los *Received:* del encabezado muestran el host `mail.jmrd.com`. 
 
 ---
 
-#### **5. Configurar SMTP correcto**
+## 9) (Opcional) Modo **solo laboratorio** (sin TLS y SMTP 25 sin AUTH)
 
-* Menú: **Configuración de la cuenta → Servidor de salida (SMTP)**.
+> Úsalo solo en redes de práctica. Las contraseñas viajan en claro.
 
-  * Elige el servidor `mail.jmrd.com` (puerto 25, sin autenticación).
-  * Marca **Establecer por defecto**.
-  * Verifica que tu identidad “[juan@jmrd.com](mailto:juan@jmrd.com)” usa este SMTP.
+1. En **Dovecot** (`/etc/dovecot/conf.d/10-auth.conf`):
+
+   ```
+   disable_plaintext_auth = no
+   ```
+2. En **Thunderbird**:
+
+   * IMAP 143 **Seguridad: Ninguna**
+   * SMTP 25 **Autenticación: Sin autenticación**
+3. (Si quieres permitir envío por red local sin AUTH) ajusta en `/etc/postfix/main.cf`:
+
+   ```
+   mynetworks = 127.0.0.0/8 172.21.45.0/24
+   ```
+
+   y reinicia Postfix.
+
+   > Recuerda: esto solo funciona si el cliente realmente sale desde esa subred. 
 
 ---
 
-#### **6. Prueba de envío y recepción**
-
-* Desde `juan@jmrd.com`: redacta correo a `maria@jmrd.com`.
-* Asunto: *Prueba interna Thunderbird*.
-* Envía.
-* En la cuenta de María, pulsa **Recibir**.
-* Verifica llegada del correo en INBOX.
-
-**En servidor:**
+## 10) Firewall (si usas UFW)
 
 ```bash
-sudo tail -n 50 /var/log/mail.log | grep maria
-```
-
-**Salida esperada:**
-
-```
-status=sent (delivered to mailbox)
+sudo ufw allow 25,143,587/tcp
+sudo ufw enable
+sudo ufw status
 ```
 
 ---
 
-#### **7. Prueba con grupo de avisos**
-
-* Desde Juan: enviar a `avisos@jmrd.com`.
-* Verifica que tanto **Juan** como **María** reciben el mensaje.
+## 11) Diagnóstico express
 
 ```bash
-sudo tail -n 50 /var/log/mail.log | grep avisos
-```
-
----
-
-#### **8. Buenas prácticas de uso**
-
-* Compactar carpetas periódicamente.
-* Revisar encabezados con **Ctrl+U** (verificar “From: mail.jmrd.com”).
-* Mantener sincronización IMAP cada 1–2 min.
-* Evitar usar “@jmrd.com” en el campo de usuario al autenticar.
-* Revisar `mail.log` si algún correo no aparece.
-
----
-
-### **4.2 Verificación de Conexión (Servidor)**
-
-```bash
-sudo journalctl -u dovecot | grep "Login: user"
-sudo ss -tulpn | grep -E ':25|:143'
-printf "Subject: Test\n\nHola\n" | sendmail -v maria@jmrd.com
-sudo tail -n 60 /var/log/mail.log
-```
-
----
-
-## **5. SISTEMA DE CORREO PASIVO**
-
-| Funcionalidad  | Estado         | Descripción                     |
-| -------------- | -------------- | ------------------------------- |
-| Recepción IMAP | ✅ Operativa    | Acceso a buzones desde clientes |
-| Autenticación  | ✅ Operativa    | Validación de usuarios          |
-| Almacenamiento | ✅ Operativo    | Maildir funcional               |
-| Envío Local    | ⚙️ Configurado | Postfix escucha en puerto 25    |
-| Envío Externo  | ❌ No requerido | Fuera del alcance pasivo        |
-
----
-
-## **6. EVIDENCIA DE FUNCIONAMIENTO**
-
-### **6.1 Servicios Activos**
-
-```bash
-sudo systemctl is-active postfix
-sudo systemctl is-active dovecot
-sudo ss -tulpn | grep :143
-telnet localhost 25
-```
-
-### **6.2 Estructura de Buzones**
-
-```bash
-sudo ls -la /home/juan/Maildir/
-sudo ls -la /home/maria/Maildir/
-```
-
----
-
-## **7. ANEXOS TÉCNICOS**
-
-### **7.1 Monitoreo**
-
-```bash
-sudo journalctl -u dovecot -f
+# Log de Postfix y Dovecot
 sudo tail -f /var/log/mail.log
-sudo doveadm who
-sudo doveadm mailbox status -u juan all
+sudo journalctl -u dovecot -f
+
+# Buzones
+ls -la /home/juan/Maildir
+ls -la /home/maria/Maildir
+
+# Verifica que Thunderbird use el SMTP correcto
 ```
 
-### **7.2 Solución de Problemas**
+---
 
-| Problema                    | Causa                                               | Solución                               |
-| --------------------------- | --------------------------------------------------- | -------------------------------------- |
-| No se pueden enviar correos | SMTP incorrecto                                     | Revisar “Servidor de salida (SMTP)”    |
-| Thunderbird no recibe       | Carpeta INBOX no suscrita                           | Click derecho → Suscribirse…           |
-| Autenticación falla         | Usuario usa “[juan@jmrd.com](mailto:juan@jmrd.com)” | Usar solo “juan”                       |
-| No hay buzones              | Permisos erróneos                                   | `chown` y `chmod` en `/home/*/Maildir` |
-| Alias no funciona           | Falta `newaliases`                                  | Ejecutar `sudo newaliases`             |
+## 12) Si cambia la IP de la VM
+
+* Actualiza **Windows `hosts`** y **`/etc/hosts` de la VM** con la nueva IP.
+* Si usas el modo laboratorio con `mynetworks`, ajusta el prefijo a la nueva subred.
 
 ---
 
-## **8. CONCLUSIÓN**
+### ✅ Resumen
 
-### **8.1 Objetivos Cumplidos**
+* **Seguro por defecto:** IMAP 143/STARTTLS y SMTP 587/STARTTLS+AUTH.
+* **Correcciones clave:** `/etc/hosts` limpio, `alias_database`, `submission` en 587, socket SASL Dovecot para Postfix, `postmaster/root` redirigidos. 
+* **Listo para operar** como correo **interno** (pasivo) con alias y clientes Thunderbird.
 
-✅ Sistema de correo corporativo pasivo operativo
-✅ Autenticación y buzones Maildir configurados
-✅ Clientes Thunderbird funcionales
-✅ Alias internos implementados correctamente
+Si te parece, al finalizar copia aquí la salida de:
 
----
+```bash
+postconf -n
+doveconf -n
+```
 
-### **8.2 Características Finales**
-
-| Parámetro           | Valor                      |
-| ------------------- | -------------------------- |
-| **Tipo**            | Correo corporativo pasivo  |
-| **Dominio**         | jmrd.com                   |
-| **Usuarios**        | juan, maria                |
-| **Grupos internos** | avisos, soporte, dirección |
-| **Cliente**         | Thunderbird IMAP           |
-
----
-
-### **8.3 Conclusión General**
-
-La implementación demuestra el funcionamiento integral de un sistema de correo electrónico corporativo interno basado en Ubuntu Server.
-Se comprendieron los roles del **MTA (Postfix)**, **MDA (Dovecot)** y **MUA (Thunderbird)**, así como la importancia de los alias y la correcta configuración del cliente para la recepción efectiva de mensajes.
-El sistema resultante es **estable, funcional y didáctico**, adecuado para entornos académicos y prácticas universitarias en administración de sistemas.
-
----
-
-📅 **Fecha de Implementación:** 14 de Octubre de 2025
-👤 **Administrador:** Chema (José María Romero Dávila)
-🏢 **Corporación:** JMRD
-✅ **Estado de Práctica:** COMPLETADA Y VALIDADA
-
----
+y reviso que todo haya quedado perfecto con tu IP **172.21.45.102**.
