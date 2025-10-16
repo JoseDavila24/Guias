@@ -1,115 +1,113 @@
-## 🧭 Paso 0 — Nombres y dominio que usaremos
+**Windows (como Administrador) – `C:\Windows\System32\drivers\etc\hosts`:**
 
-* **Dominio interno:** `jmrd.com`
-* **Hostname del servidor:** `mail.jmrd.com` (apuntando a **172.21.45.102**)
+```
+172.21.46.52   mail.jmrd.com
+```
 
-> Si cambias el dominio, reemplázalo en los comandos.
+**En la VM:**
+
+```bash
+# /etc/hosts (NO mezclar 'localhost' con la IP real)
+sudo bash -c 'cat >/etc/hosts <<EOF
+127.0.0.1   localhost
+172.21.46.52 mail.jmrd.com mail
+EOF'
+
+# Si usaste mynetworks con la subred anterior, actualiza a /24 de 172.21.46.0
+sudo postconf -e 'mynetworks = 127.0.0.0/8 172.21.46.0/24'
+sudo systemctl restart postfix dovecot
+```
 
 ---
 
-## 1) Preparar resolución de nombres
+# Guía “Solo laboratorio” (Ubuntu 24.04 + Multipass) — **IP 172.21.46.52**
 
-### 1.1. En **Windows** (donde usarás Thunderbird)
+**Entorno**
 
-Abrir el bloc de notas **como Administrador** y editar:
+* **VM:** `correo` (Multipass)
+* **Ubuntu:** 24.04.3 LTS
+* **IP:** **172.21.46.52**
+* **Dominio:** `jmrd.com`
+* **FQDN:** `mail.jmrd.com`
+* **Usuarios de prueba:** `juan`, `maria`
+
+> Esta guía usa **IMAP 143 en texto claro** y **SMTP 25 sin autenticación**. No la expongas a Internet. 
+
+---
+
+## 0) Resolución de nombres (Windows + VM)
+
+### 0.1 Windows (Thunderbird)
+
+Edita **como Administrador** `C:\Windows\System32\drivers\etc\hosts` y añade:
 
 ```
-C:\Windows\System32\drivers\etc\hosts
+172.21.46.52   mail.jmrd.com
 ```
 
-Añade esta línea y guarda:
-
-```
-172.21.45.102   mail.jmrd.com
-```
-
-### 1.2. En la **VM** (Multipass)
-
-Entra a la VM y configura hostname y `/etc/hosts`:
+### 0.2 VM (Multipass)
 
 ```bash
 multipass shell correo
 
-# Hostname/FQDN
+# Nombre de host y /etc/mailname
 sudo hostnamectl set-hostname mail.jmrd.com
 echo jmrd.com | sudo tee /etc/mailname
 
-# /etc/hosts (NO mezclar localhost con la IP de la VM)
+# /etc/hosts (⚠️ no mezcles 'localhost' en la línea de la IP)
 sudo bash -c 'cat >/etc/hosts <<EOF
 127.0.0.1   localhost
-172.21.45.102 mail.jmrd.com mail
+172.21.46.52 mail.jmrd.com mail
 EOF'
 ```
 
-> Corregimos el error típico de poner `localhost` en la misma línea de la IP del servidor. 
+> Evita poner `localhost` junto a la IP real del servidor. 
 
 ---
 
-## 2) Instalar paquetes mínimos
+## 1) Paquetes mínimos
 
 ```bash
 sudo apt update && sudo apt -y upgrade
 sudo apt -y install postfix dovecot-imapd mailutils
 ```
 
-Durante la instalación de **Postfix**:
+Durante Postfix:
 
-* Tipo: **Internet Site**
-* System mail name: **jmrd.com**
+* **Internet Site**
+* **System mail name:** `jmrd.com`
 
 ---
 
-## 3) Postfix (SMTP) — configuración base + envío autenticado (587)
+## 2) Postfix (SMTP) — básico sin AUTH
 
-Edita `/etc/postfix/main.cf` y deja al menos esto:
+Edita `/etc/postfix/main.cf` y deja al menos:
 
 ```ini
 # Identidad
 myhostname = mail.jmrd.com
-mydomain = jmrd.com
-myorigin = /etc/mailname
+mydomain   = jmrd.com
+myorigin   = /etc/mailname
 mydestination = $myhostname, $mydomain, localhost.$mydomain, localhost
 
 # Red / protocolos
 inet_interfaces = all
 inet_protocols = ipv4
 
-# Buzones en formato Maildir
+# Formato de buzones
 home_mailbox = Maildir/
 
-# Mapas de alias
-alias_maps = hash:/etc/aliases
+# Alias
+alias_maps     = hash:/etc/aliases
 alias_database = hash:/etc/aliases
 
-# TLS (usar certificados "snakeoil" por simplicidad)
-smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem
-smtpd_tls_key_file  = /etc/ssl/private/ssl-cert-snakeoil.key
-smtpd_tls_security_level = may
-smtp_tls_security_level  = may
-
-# SASL con Dovecot (para SMTP AUTH en puerto 587)
-smtpd_sasl_type = dovecot
-smtpd_sasl_path = private/auth
-smtpd_sasl_auth_enable = yes
-smtpd_sasl_security_options = noanonymous
-
-# Reglas de relé (no ser open relay)
-smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination
+# Antirrelé (solo laboratorio, sin AUTH)
+mynetworks = 127.0.0.0/8 172.21.46.0/24
+smtpd_relay_restrictions    = permit_mynetworks, reject_unauth_destination
+smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination
 ```
 
-Activa el servicio **submission (587)** con TLS obligatorio y AUTH:
-
-```bash
-sudo postconf -M submission/inet='submission inet n - y - - smtpd'
-sudo postconf -P 'submission/inet/syslog_name=postfix/submission'
-sudo postconf -P 'submission/inet/smtpd_tls_security_level=encrypt'
-sudo postconf -P 'submission/inet/smtpd_sasl_auth_enable=yes'
-sudo postconf -P 'submission/inet/milter_macro_daemon_name=ORIGINATING'
-```
-
-> Añadimos también `alias_database` y reforzamos el relé con `smtpd_relay_restrictions`. 
-
-Aplica cambios:
+Aplica:
 
 ```bash
 sudo newaliases
@@ -117,64 +115,35 @@ sudo systemctl restart postfix
 sudo postconf -n | sed -n '1,200p'
 ```
 
+> Para **entrega local a @jmrd.com**, no necesitas estar en `mynetworks`. Esa lista solo importará si intentas relé a dominios externos (lo cual aquí no haremos). 
+
 ---
 
-## 4) Dovecot (IMAP) — Maildir + TLS + socket para Postfix
-
-### 4.1. Ubicación de buzones
-
-```
-sudo sed -i 's|^#\?mail_location.*|mail_location = maildir:~/Maildir|' /etc/dovecot/conf.d/10-mail.conf
-```
-
-### 4.2. Autenticación segura
-
-```
-sudo sed -i 's/^#\?disable_plaintext_auth.*/disable_plaintext_auth = yes/' /etc/dovecot/conf.d/10-auth.conf
-sudo sed -i 's/^#\?auth_mechanisms.*/auth_mechanisms = plain login/' /etc/dovecot/conf.d/10-auth.conf
-```
-
-### 4.3. SSL/TLS
-
-```
-sudo sed -i 's/^#\?ssl = .*/ssl = yes/' /etc/dovecot/conf.d/10-ssl.conf
-sudo sed -i 's|^#\?ssl_cert =.*|ssl_cert = </etc/ssl/certs/ssl-cert-snakeoil.pem|' /etc/dovecot/conf.d/10-ssl.conf
-sudo sed -i 's|^#\?ssl_key =.*|ssl_key = </etc/ssl/private/ssl-cert-snakeoil.key|' /etc/dovecot/conf.d/10-ssl.conf
-```
-
-### 4.4. Socket SASL para Postfix (imprescindible para AUTH)
-
-Abre `/etc/dovecot/conf.d/10-master.conf` y asegúrate de **descomentar/añadir**:
-
-```conf
-service auth {
-  unix_listener /var/spool/postfix/private/auth {
-    mode = 0660
-    user = postfix
-    group = postfix
-  }
-}
-```
-
-Aplica cambios y verifica:
+## 3) Dovecot (IMAP) — texto claro (sin TLS)
 
 ```bash
+# Ubicación de buzones
+sudo sed -i 's|^#\?mail_location.*|mail_location = maildir:~/Maildir|' /etc/dovecot/conf.d/10-mail.conf
+
+# Permitir autenticación en texto claro (solo laboratorio)
+sudo sed -i 's/^#\?disable_plaintext_auth.*/disable_plaintext_auth = no/' /etc/dovecot/conf.d/10-auth.conf
+sudo sed -i 's/^#\?auth_mechanisms.*/auth_mechanisms = plain login/' /etc/dovecot/conf.d/10-auth.conf
+
+# Desactivar TLS/STARTTLS explícitamente
+sudo sed -i 's/^#\?ssl = .*/ssl = no/' /etc/dovecot/conf.d/10-ssl.conf
+
 sudo systemctl restart dovecot
 sudo doveconf -n | sed -n '1,200p'
 ```
 
-> En tu guía original se utilizaba autenticación en texto plano “para taller”; aquí activamos STARTTLS y dejamos AUTH seguro como camino principal. 
-
 ---
 
-## 5) Usuarios y Maildir
+## 4) Usuarios y Maildir
 
 ```bash
-# Crea usuarios
 sudo adduser juan
 sudo adduser maria
 
-# Crea Maildir con permisos correctos
 sudo -u juan  maildirmake.dovecot ~/Maildir
 sudo -u maria maildirmake.dovecot ~/Maildir
 sudo chmod -R 700 /home/*/Maildir
@@ -182,9 +151,9 @@ sudo chmod -R 700 /home/*/Maildir
 
 ---
 
-## 6) Alias internos (incluye postmaster/root)
+## 5) Alias internos (útiles en laboratorio)
 
-Edita `/etc/aliases` y añade (además de tus grupos):
+Edita `/etc/aliases`:
 
 ```
 postmaster: juan
@@ -194,21 +163,21 @@ soporte: juan
 direccion: maria
 ```
 
+Aplica:
+
 ```bash
 sudo newaliases
 sudo postfix reload
 ```
 
-> Redirigir `postmaster` y `root` a un buzón real es buena práctica y requerido por estándares. 
-
 ---
 
-## 7) Pruebas rápidas en servidor
+## 6) Verificaciones en servidor
 
 ```bash
 # Servicios y puertos
 systemctl --no-pager status postfix dovecot
-ss -lntp | grep -E ':25|:143|:587'
+ss -lntp | grep -E ':25|:143'
 
 # Autenticación Dovecot
 sudo doveadm auth test juan
@@ -219,115 +188,84 @@ printf "Subject: Test Local\n\nHola Maria\n" | sendmail -v maria@jmrd.com
 sudo tail -n 80 /var/log/mail.log | tail
 ```
 
-*Opcional TLS SMTP:*
-
-```bash
-# Comprobar que 587 acepta STARTTLS y AUTH
-nc -vz mail.jmrd.com 587
-```
+Salida esperada: `status=sent (delivered to mailbox)`.
 
 ---
 
-## 8) Configurar Thunderbird (en Windows)
+## 7) Thunderbird (cliente) — **sin seguridad**
 
-**Cuenta IMAP (recomendada):**
+**Cuenta IMAP:**
 
-* **Nombre:** Juan Pérez
 * **Correo:** `juan@jmrd.com`
 * **Contraseña:** (la de `juan`)
-* Ir a **Configuración manual** y usa:
+* **Configuración manual:**
 
-| Parámetro     | Entrante (IMAP)   | Saliente (SMTP)   |
-| ------------- | ----------------- | ----------------- |
-| Servidor      | mail.jmrd.com     | mail.jmrd.com     |
-| Puerto        | **143**           | **587**           |
-| Seguridad     | **STARTTLS**      | **STARTTLS**      |
-| Autenticación | Contraseña normal | Contraseña normal |
-| Usuario       | juan              | juan              |
+| Parámetro     | IMAP (entrante)   | SMTP (saliente)                     |
+| ------------- | ----------------- | ----------------------------------- |
+| Servidor      | mail.jmrd.com     | mail.jmrd.com                       |
+| Puerto        | **143**           | **25**                              |
+| Seguridad     | **Ninguna**       | **Ninguna**                         |
+| Autenticación | Contraseña normal | **Sin autenticación**               |
+| Usuario       | juan              | juan *(se ignora en SMTP sin AUTH)* |
 
-**Probar:**
-
-* Desde `juan@jmrd.com`, envía a `maria@jmrd.com`.
-* Revisa INBOX de María.
-* En el servidor, valida:
-
-  ```bash
-  sudo tail -n 50 /var/log/mail.log | grep maria
-  ```
-
-> Nota: “From:” mostrará `usuario@jmrd.com`; los *Received:* del encabezado muestran el host `mail.jmrd.com`. 
-
----
-
-## 9) (Opcional) Modo **solo laboratorio** (sin TLS y SMTP 25 sin AUTH)
-
-> Úsalo solo en redes de práctica. Las contraseñas viajan en claro.
-
-1. En **Dovecot** (`/etc/dovecot/conf.d/10-auth.conf`):
-
-   ```
-   disable_plaintext_auth = no
-   ```
-2. En **Thunderbird**:
-
-   * IMAP 143 **Seguridad: Ninguna**
-   * SMTP 25 **Autenticación: Sin autenticación**
-3. (Si quieres permitir envío por red local sin AUTH) ajusta en `/etc/postfix/main.cf`:
-
-   ```
-   mynetworks = 127.0.0.0/8 172.21.45.0/24
-   ```
-
-   y reinicia Postfix.
-
-   > Recuerda: esto solo funciona si el cliente realmente sale desde esa subred. 
-
----
-
-## 10) Firewall (si usas UFW)
+**Probar:** desde `juan@jmrd.com` envía a `maria@jmrd.com`.
+Servidor:
 
 ```bash
-sudo ufw allow 25,143,587/tcp
-sudo ufw enable
-sudo ufw status
+sudo tail -n 50 /var/log/mail.log | grep maria
 ```
 
+> **SMTP 25 sin AUTH** acepta envíos al dominio local `@jmrd.com` y **rechaza relé externo** por `reject_unauth_destination`. 
+
 ---
 
-## 11) Diagnóstico express
+## 8) Diagnóstico express
 
 ```bash
-# Log de Postfix y Dovecot
+# Conectividad
+ping -c 3 mail.jmrd.com
+nc -vz mail.jmrd.com 25
+nc -vz mail.jmrd.com 143
+
+# Logs en vivo
 sudo tail -f /var/log/mail.log
 sudo journalctl -u dovecot -f
 
 # Buzones
 ls -la /home/juan/Maildir
 ls -la /home/maria/Maildir
+```
 
-# Verifica que Thunderbird use el SMTP correcto
+### Problemas típicos
+
+* **No llega al buzón:** revisa `/etc/hosts` y propiedad/permisos de `Maildir`.
+* **Thunderbird no conecta:** confirma `ssl = no` en Dovecot y **Seguridad: Ninguna** en IMAP/SMTP.
+* **Alias no funciona:** faltó `newaliases`.
+
+---
+
+## 9) Firewall (si usas UFW)
+
+```bash
+sudo ufw allow 25,143/tcp
+sudo ufw enable
+sudo ufw status
 ```
 
 ---
 
-## 12) Si cambia la IP de la VM
+## 10) Si vuelve a cambiar la IP
 
-* Actualiza **Windows `hosts`** y **`/etc/hosts` de la VM** con la nueva IP.
-* Si usas el modo laboratorio con `mynetworks`, ajusta el prefijo a la nueva subred.
+* Actualiza **Windows `hosts`** y **`/etc/hosts`** con la nueva IP.
+* Si usaste `mynetworks`, ajusta a la **subred /24** que corresponda (p. ej., `172.21.47.0/24`).
 
 ---
 
 ### ✅ Resumen
 
-* **Seguro por defecto:** IMAP 143/STARTTLS y SMTP 587/STARTTLS+AUTH.
-* **Correcciones clave:** `/etc/hosts` limpio, `alias_database`, `submission` en 587, socket SASL Dovecot para Postfix, `postmaster/root` redirigidos. 
-* **Listo para operar** como correo **interno** (pasivo) con alias y clientes Thunderbird.
+* **IP actual:** **172.21.46.52**
+* **Modo laboratorio:** IMAP 143 (texto claro) + SMTP 25 sin AUTH.
+* **No open relay:** `reject_unauth_destination` bloquea relé externo; entrega local a `@jmrd.com` operativa.
+* **Puntos clave:** `/etc/hosts` limpio, `mynetworks` a **172.21.46.0/24**, `ssl = no` en Dovecot, `alias_database` definido. 
 
-Si te parece, al finalizar copia aquí la salida de:
-
-```bash
-postconf -n
-doveconf -n
-```
-
-y reviso que todo haya quedado perfecto con tu IP **172.21.45.102**.
+Si quieres, pega ahora `postconf -n` y `doveconf -n` y reviso que todo haya quedado exacto con la IP **172.21.46.52**.
