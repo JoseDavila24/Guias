@@ -1,7 +1,5 @@
 # Guía “LAB sin seguridad” (Postfix + Dovecot) **con IP directa en el cliente**
 
-## **INTRODUCCIÓN**
-
 ### **Objetivo**
 
 Implementar un **sistema de correo corporativo pasivo** sobre **Ubuntu Server 24.04 LTS**, utilizando **Postfix** como *Mail Transfer Agent (MTA)* y **Dovecot** como *Mail Delivery Agent (MDA)*, bajo el dominio corporativo **jmrd.com**.
@@ -14,18 +12,6 @@ Implementar un **sistema de correo corporativo pasivo** sobre **Ubuntu Server 24
 * ✅ Acceso mediante cliente Thunderbird
 * ❌ Comunicación con dominios externos
 * ❌ Resolución DNS MX externa
-
-### **Especificaciones Técnicas**
-
-| Elemento           | Descripción             |
-| ------------------ | ----------------------- |
-| **Servidor**       | Ubuntu Server 24.04 LTS |
-| **Virtualización** | Multipass con Hyper-V   |
-| **Dirección IP**   | 172.19.69.99            |
-| **Dominio**        | jmrd.com                |
-| **Usuarios**       | juan, maria             |
-
----
 
 ## **ARQUITECTURA DEL SISTEMA**
 
