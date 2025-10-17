@@ -1,57 +1,56 @@
-# Guía “LAB sin seguridad” (Postfix + Dovecot) con **IP directa** en el cliente
+# Guía “LAB sin seguridad” (Postfix + Dovecot) **con IP directa en el cliente**
 
-**Entorno esperado**
+**Entorno previsto**
 
 * **Virtualización:** Multipass
-* **Ubuntu:** 24.04 LTS (VM nueva, IP por DHCP)
+* **Ubuntu:** 24.04 LTS (VM recién creada, IP por DHCP)
 * **Dominio interno:** `jmrd.com`
-* **FQDN del servidor:** `mail.jmrd.com` (solo para identidad del MTA; el cliente usará **IP**)
+* **FQDN del servidor:** `mail.jmrd.com` (para identidad local; **Thunderbird usará la IP**)
 
-> **Objetivo:** correo **interno** `@jmrd.com` (sin TLS/STARTTLS ni SMTP AUTH). **No** exponer a Internet.
+> **Modo laboratorio:** sin TLS/STARTTLS y **sin SMTP AUTH**. **No** exponer a Internet.
 
 ---
 
-## 0) Crear la VM y **anotar la IP**
+## 0) Crear VM y anotar la IP
 
-En **Windows** (PowerShell o CMD):
+En **Windows** (PowerShell/CMD):
 
 ```bash
 multipass launch 24.04 --name correo --cpus 2 --memory 2G --disk 10G
 multipass info correo
-# Anota la IPv4 que salga aquí (ej: 172.21.x.y).
+# Anota la IPv4 (ej. 172.21.X.Y)
 ```
 
-> Esa IP será la que pondrás en **Thunderbird** como “Nombre del servidor” IMAP y SMTP.
+> Esa IP la pondrás en Thunderbird como “Nombre del servidor” IMAP y SMTP (no usaremos `hosts` en Windows).
 
 ---
 
 ## 1) Preparación básica dentro de la VM
 
-Entra a la VM:
+Entrar a la VM:
 
 ```bash
 multipass shell correo
 ```
 
-Configura nombre e identidad **locales** (el cliente no depende de esto, pero Postfix/Dovecot sí):
+Identidad del host/MTA:
 
 ```bash
-# Identidad del host/MTA
 sudo hostnamectl set-hostname mail.jmrd.com
 echo jmrd.com | sudo tee /etc/mailname
 ```
 
-Ajusta `/etc/hosts` **sin** tocar Windows:
+`/etc/hosts` **solo local** (no dependemos de la IP de la NIC):
 
 ```bash
-# Mapea el FQDN a 127.0.1.1 para resolver localmente sin depender de la IP de la NIC.
+# ⚠️ No mezcles 'localhost' con el FQDN en la misma línea
 sudo bash -c 'cat >/etc/hosts <<EOF
 127.0.0.1   localhost
 127.0.1.1   mail.jmrd.com mail
 EOF'
 ```
 
-> Nota: mantenemos `localhost` **solo** en 127.0.0.1; no lo mezclamos con el FQDN. 
+> Mantener `localhost` en 127.0.0.1 evita errores de resolución. 
 
 ---
 
@@ -64,78 +63,62 @@ sudo apt -y install postfix dovecot-imapd mailutils
 
 Durante Postfix:
 
-* **Internet Site**
-* **System mail name:** `jmrd.com`
+* Tipo: **Internet Site**
+* System mail name: **jmrd.com**
 
 ---
 
-## 3) Postfix (SMTP) — **mínimo sin autenticación**
+## 3) Postfix (SMTP) — mínimo, sin AUTH (no open relay)
 
-Usa `postconf -e` para dejarlo listo:
+> **Importante:** No crear *overrides* de systemd. Usaremos la unidad de paquete tal como viene.
+
+Ajustar parámetros con `postconf -e`:
 
 ```bash
 # Identidad
 sudo postconf -e "myhostname=mail.jmrd.com"
 sudo postconf -e "mydomain=jmrd.com"
-sudo postconf -e "myorigin=/etc/mailname"
+sudo postconf -e "myorigin=jmrd.com"   # explícito para evitar confusión
 sudo postconf -e "mydestination=\$myhostname, \$mydomain, localhost.\$mydomain, localhost"
 
-# Red/protocolos
+# Red / protocolos
 sudo postconf -e "inet_interfaces=all"
 sudo postconf -e "inet_protocols=ipv4"
 
-# Buzones en Maildir
+# Buzones Maildir
 sudo postconf -e "home_mailbox=Maildir/"
 
 # Alias
 sudo postconf -e "alias_maps=hash:/etc/aliases"
 sudo postconf -e "alias_database=hash:/etc/aliases"
 
-# No open relay (laboratorio, sin AUTH). 
-# mynetworks SOLO loopback: los clientes externos podrán enviar a @jmrd.com (destino local),
-# pero NO relé a dominios externos (lo bloqueará reject_unauth_destination).
+# Anti‑relé (lab sin AUTH): entrega local permitida; relé externo bloqueado
 sudo postconf -e "mynetworks=127.0.0.0/8"
 sudo postconf -e "smtpd_relay_restrictions=permit_mynetworks, reject_unauth_destination"
 
+# Aplicar mapas de alias
 sudo newaliases
-```
 
-### (Opcional) **Chequeo/override** de systemd para Postfix
-
-> Rara vez, alguna instalación trae `ExecStart=/bin/true`. Si se detecta, aplicamos **override** (sin pisar archivos del paquete):
-
-```bash
-if systemctl cat postfix | grep -q 'ExecStart=/bin/true'; then
-  echo "Corrigiendo unidad systemd de Postfix mediante override..."
-  sudo mkdir -p /etc/systemd/system/postfix.service.d
-  sudo tee /etc/systemd/system/postfix.service.d/override.conf > /dev/null << 'EOF'
-[Service]
-ExecStart=
-ExecReload=
-ExecStop=
-Type=forking
-PIDFile=/var/spool/postfix/pid/master.pid
-ExecStart=/usr/sbin/postfix start
-ExecReload=/usr/sbin/postfix reload
-ExecStop=/usr/sbin/postfix stop
-EOF
-  sudo systemctl daemon-reload
-fi
-
+# Preferir 'reload' (idempotente) para evitar "already running"
 sudo systemctl enable --now postfix
-sudo systemctl restart postfix
+sudo systemctl reload postfix
 sudo postconf -n | sed -n '1,200p'
 ```
 
+> **Nota:** `myorigin=/etc/mailname` es **válido** (Postfix acepta rutas que contienen el dominio), pero aquí usamos `myorigin=jmrd.com` para simplificar. Si otro día prefieres `/etc/mailname`, asegúrate de que su contenido sea exactamente `jmrd.com`.
+
+> **Si alguna vez creaste un override** en `/etc/systemd/system/postfix.service.d/`: bórralo y recarga demonios:
+> `sudo rm -rf /etc/systemd/system/postfix.service.d && sudo systemctl daemon-reload && sudo systemctl reset-failed postfix && sudo systemctl reload postfix`
+
 ---
 
-## 4) Dovecot (IMAP) — **texto claro, sin TLS**
+## 4) Dovecot (IMAP) — texto claro (sin TLS)
 
 ```bash
-# Ubicación de buzones
+# Buzones Maildir
 sudo sed -i 's|^#\?mail_location.*|mail_location = maildir:~/Maildir|' /etc/dovecot/conf.d/10-mail.conf
 
-# Permitir autenticación en claro (modo laboratorio)
+# Autenticación en claro (solo laboratorio)
 sudo sed -i 's/^#\?disable_plaintext_auth.*/disable_plaintext_auth = no/' /etc/dovecot/conf.d/10-auth.conf
 sudo sed -i 's/^#\?auth_mechanisms.*/auth_mechanisms = plain login/' /etc/dovecot/conf.d/10-auth.conf
 
@@ -149,29 +132,27 @@ sudo doveconf -n | sed -n '1,200p'
 
 ---
 
-## 5) Usuarios y Maildir  **(con rutas absolutas y permisos por usuario)**
+## 5) Usuarios y Maildir  **(rutas absolutas y permisos por usuario)**
 
 ```bash
-# Crea usuarios de prueba
+# Usuarios de prueba
 sudo adduser juan
 sudo adduser maria
 
-# Crea Maildir con dueño correcto - USAR RUTAS ABSOLUTAS
+# Crear Maildir con rutas absolutas (evita fallos de expansión)
 sudo -u juan  maildirmake.dovecot /home/juan/Maildir
 sudo -u maria maildirmake.dovecot /home/maria/Maildir
 
-# Permisos individuales (evita fallos de globbing)
+# Permisos y propiedad (por usuario)
 sudo chmod -R 700 /home/juan/Maildir
 sudo chmod -R 700 /home/maria/Maildir
 sudo chown -R juan:juan   /home/juan/Maildir
 sudo chown -R maria:maria /home/maria/Maildir
 ```
 
-> Esto evita errores de expansión con patrones como `/*/` y garantiza propiedad/permisos correctos.
-
 ---
 
-## 6) Alias internos (útiles en práctica)
+## 6) Alias internos (útiles)
 
 ```bash
 sudo tee -a /etc/aliases > /dev/null << 'EOF'
@@ -186,11 +167,11 @@ sudo newaliases
 sudo postfix reload
 ```
 
-> Redirigir **postmaster**/**root** evita perder avisos del sistema. 
+> Redirigir **postmaster/root** a un buzón real evita perder avisos. 
 
 ---
 
-## 7) Verificaciones rápidas en el servidor
+## 7) Verificaciones en el servidor
 
 ```bash
 # Servicios y puertos
@@ -201,7 +182,7 @@ ss -lntp | grep -E ':25|:143'
 sudo doveadm auth test juan
 sudo doveadm auth test maria
 
-# Entrega local (Juan → Maria)
+# Entrega local (Juan → María)
 printf "Subject: Test Local\n\nHola Maria\n" | sendmail -v maria@jmrd.com
 sudo tail -n 80 /var/log/mail.log | tail
 # Esperado: "status=sent (delivered to mailbox)"
@@ -209,47 +190,39 @@ sudo tail -n 80 /var/log/mail.log | tail
 
 ---
 
-## 8) Configurar **Thunderbird** usando **la IP** (sin tocar hosts)
+## 8) Configurar **Thunderbird** usando **la IP** (sin tocar `hosts`)
 
-1. En Windows, ejecuta:
+1. En Windows, obtén la IP:
 
    ```bash
    multipass info correo
    ```
+2. En **Thunderbird** → **☰ → Nueva → Cuenta de correo existente → Configuración manual**.
+   Usa **la IP** como “Servidor” (IMAP y SMTP):
 
-   Copia la **IPv4** (ej: `172.21.46.52`).
+| Parámetro     | IMAP (entrante)   | SMTP (saliente)                |
+| ------------- | ----------------- | ------------------------------ |
+| **Servidor**  | **<IP de la VM>** | **<IP de la VM>**              |
+| **Puerto**    | **143**           | **25**                         |
+| **Seguridad** | **Ninguna**       | **Ninguna**                    |
+| **Auth**      | Contraseña normal | **Sin autenticación**          |
+| **Usuario**   | juan              | *(se ignora en SMTP sin AUTH)* |
 
-2. **Thunderbird → Nueva → Cuenta de correo existente → Configuración manual**
-   Usa **la IP** como “Nombre del servidor” (IMAP y SMTP):
+**Prueba:** desde `juan@jmrd.com` envía a `maria@jmrd.com`; en la cuenta de María pulsa **Recibir**.
+En el servidor:
 
-| Parámetro     | IMAP (entrante)   | SMTP (saliente)                   |
-| ------------- | ----------------- | --------------------------------- |
-| **Servidor**  | **<IP de la VM>** | **<IP de la VM>**                 |
-| **Puerto**    | **143**           | **25**                            |
-| **Seguridad** | **Ninguna**       | **Ninguna**                       |
-| **Auth**      | Contraseña normal | **Sin autenticación**             |
-| **Usuario**   | juan              | *(se ignora en SMTP 25 sin AUTH)* |
+```bash
+sudo tail -n 50 /var/log/mail.log | grep maria
+```
 
-3. **Probar**:
-
-   * Desde `juan@jmrd.com` envía a `maria@jmrd.com`.
-   * En la cuenta de María, pulsa **Recibir**.
-   * En el servidor:
-
-     ```bash
-     sudo tail -n 50 /var/log/mail.log | grep maria
-     ```
-
-> **Envíos externos:** serán rechazados (no hay AUTH; `reject_unauth_destination` evita open relay).
+> **SMTP 25 sin AUTH** permite envíos al dominio local `@jmrd.com` y **bloquea relé externo** por `reject_unauth_destination`.
 
 ---
 
-## 9) Diagnóstico útil
+## 9) Diagnóstico rápido (útil)
 
 ```bash
-# Conectividad (desde la VM)
-ping -c 3 8.8.8.8 || true
-# Si tienes 'nc' instalado:
+# Conectividad (instala netcat si hace falta)
 sudo apt -y install netcat-openbsd
 nc -vz 127.0.0.1 25
 nc -vz 127.0.0.1 143
@@ -263,11 +236,12 @@ ls -la /home/juan/Maildir
 ls -la /home/maria/Maildir
 ```
 
-**Problemas típicos**
+**Problemas típicos y solución**
 
-* No llega al buzón → verifica `/etc/hosts`, existencia de `Maildir` y permisos (700).
-* Thunderbird no conecta → `ssl = no` en Dovecot y **Seguridad: Ninguna** en el cliente.
-* Alias no funciona → faltó `sudo newaliases`.
+* **“already running” al reiniciar Postfix:** usa `sudo postfix status`; luego `sudo systemctl reload postfix` (idempotente). Si alguna vez creaste un *override*, elimínalo como arriba.
+* **No llega al buzón:** verifica `/etc/hosts`, existencia de `Maildir` y permisos (700).
+* **Thunderbird no conecta:** confirma `ssl = no` en Dovecot y **Seguridad: Ninguna** en el cliente.
+* **Alias no funciona:** faltó `sudo newaliases`.
 
 ---
 
@@ -281,20 +255,18 @@ sudo ufw status
 
 ---
 
-## 11) ¿Cambia la IP otra vez?
+## 11) Si la IP cambia otra vez
 
-* **No cambies nada en el servidor.**
-* En **Thunderbird**, edita la cuenta y **sustituye la IP** en los servidores IMAP/SMTP.
-* Listo.
+* No toques el servidor.
+* En **Thunderbird**, edita la cuenta y **sustituye la IP** en IMAP/SMTP.
+* Vuelve a probar envío y recepción.
 
 ---
 
 ### ✅ Resumen
 
-* Guía lista para VM nueva, **cliente con IP directa** (sin tocar `hosts` en Windows).
-* Postfix/Dovecot en **modo laboratorio**: IMAP 143 en claro + SMTP 25 sin AUTH (solo entrega local `@jmrd.com`).
-* Maildir **con rutas absolutas** y permisos/propiedad por usuario.
-* Chequeo **systemd** opcional, seguro vía *override*.
-* Basada y corregida a partir de tu documento original. 
-
-Si quieres, al terminar pega `postconf -n` y `doveconf -n` y te valido que todo quedó al 100%.
+* **LAB sin seguridad:** IMAP 143 en claro + SMTP 25 sin AUTH (solo entrega local `@jmrd.com`).
+* **Postfix sin overrides:** usamos `reload` para aplicar cambios (evita el “already running”).
+* **Maildir robusto:** rutas absolutas + permisos/propiedad por usuario.
+* **Thunderbird:** usa **IP directa** (no se modifica `hosts` en Windows).
+* Guía corregida partiendo de tu documento original. 
