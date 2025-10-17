@@ -1,47 +1,5 @@
 # Guía “LAB sin seguridad” (Postfix + Dovecot) **con IP directa en el cliente**
 
-### **Objetivo**
-
-Implementar un **sistema de correo corporativo pasivo** sobre **Ubuntu Server 24.04 LTS**, utilizando **Postfix** como *Mail Transfer Agent (MTA)* y **Dovecot** como *Mail Delivery Agent (MDA)*, bajo el dominio corporativo **jmrd.com**.
-
-### **Alcance**
-
-* ✅ Correo interno corporativo
-* ✅ Autenticación de usuarios locales
-* ✅ Almacenamiento en buzones Maildir
-* ✅ Acceso mediante cliente Thunderbird
-* ❌ Comunicación con dominios externos
-* ❌ Resolución DNS MX externa
-
-## **ARQUITECTURA DEL SISTEMA**
-
-### **Diagrama de Arquitectura**
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Thunderbird   │ ── │   Dovecot IMAP   │ ── │   Buzones       │
-│   (Cliente)     │    │   (Recepción)    │    │   Maildir       │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-         │                        │                        │
-         └────────────────────────┼────────────────────────┘
-                                  │
-                         ┌──────────────────┐
-                         │   Postfix SMTP   │
-                         │   (Envío Local)  │
-                         └──────────────────┘
-```
-
-### **Componentes Implementados**
-
-| Componente      | Función                   | Estado         |
-| --------------- | ------------------------- | -------------- |
-| **Postfix**     | MTA – Envío SMTP          | ⚙️ Configurado |
-| **Dovecot**     | MDA – Recepción IMAP/POP3 | ✅ Operativo    |
-| **Thunderbird** | MUA – Cliente de correo   | ✅ Conectado    |
-| **Multipass**   | Virtualización            | ✅ Operativo    |
-
----
-
 **Entorno previsto**
 
 * **Virtualización:** Multipass
@@ -50,6 +8,7 @@ Implementar un **sistema de correo corporativo pasivo** sobre **Ubuntu Server 24
 * **FQDN del servidor:** `mail.jmrd.com` (para identidad local; **Thunderbird usará la IP**)
 
 > **Modo laboratorio:** sin TLS/STARTTLS y **sin SMTP AUTH**. **No** exponer a Internet.
+
 ---
 
 ## 0) Crear VM y anotar la IP
