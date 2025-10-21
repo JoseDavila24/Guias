@@ -1,207 +1,385 @@
-# Guía exprés — FreeBSD + Postfix + Dovecot (LAB sin seguridad, con IP)
+## 0) Datos que vas a usar
 
-**Escenario**
+* **Dominio**: `jmrd.com`
+* **IP de la VM (FreeBSD en Hyper‑V)**: la llamaremos **`VM_IP`** (ej. `192.168.100.10`)
+* **Red del lab en CIDR**: la llamaremos **`LAB_CIDR`** (ej. `192.168.100.0/24`)
+* **Interfaz en Hyper‑V**: normalmente `hn0` en FreeBSD (driver Hyper‑V)
 
-* **Hypervisor:** VirtualBox
-* **SO:** FreeBSD 13/14
-* **Dominio interno:** `jmrd.local` (puedes cambiarlo)
-* **FQDN del servidor:** `mail.jmrd.local` (solo identidad local)
-* **Cliente:** Windows + Thunderbird (usará **la IP** del servidor)
+Encuentra la IP real y tu red:
 
-> **Red de VM:** usa **Bridged** o **Host‑Only** (recomendado). **NAT** puro no permite conexiones entrantes desde Windows sin *port‑forwarding*.
+```sh
+ifconfig hn0 | grep -E 'inet '           # mira la IP (VM_IP)
+netstat -rn | head -n 5                  # te ayuda a deducir el LAB_CIDR
+```
 
----
-
-## 0) Antes de empezar
-
-1. Arranca FreeBSD y **anota la IP** de la interfaz que Windows puede alcanzar (ej.: `192.168.56.10` si es Host‑Only, o la de tu LAN si es Bridged):
-
-   ```sh
-   ifconfig -a | egrep 'inet '
-   ```
-2. (Opcional) Actualiza base:
-
-   ```sh
-   freebsd-update fetch install
-   ```
+> Si no quieres comerte la cabeza con CIDR, usa la subred /24 donde está tu IP (p.ej. si VM_IP es 192.168.100.10, pon LAB_CIDR=192.168.100.0/24).
 
 ---
 
-## 1) Paquetes
+## 1) Preparar el sistema
+
+**(a) Hostname y resolución local (opcional pero recomendado)**
+
+```sh
+sysrc hostname="jmrd.com"
+hostname jmrd.com
+```
+
+En **/etc/hosts** de clientes y del propio servidor, puedes añadir (si quieres resolver el nombre además de usar la IP):
+
+```
+VM_IP jmrd.com
+```
+
+**(b) Paquetes**
 
 ```sh
 pkg update
 pkg install -y postfix dovecot
+sysrc postfix_enable=YES
+sysrc dovecot_enable=YES
+```
+
+**(c) mailer.conf → Postfix**
+Asegúrate de que las utilidades “sendmail” apuntan a Postfix:
+
+Edita **/etc/mail/mailer.conf** y déjalo así:
+
+```
+sendmail        /usr/local/sbin/sendmail
+send-mail       /usr/local/sbin/sendmail
+mailq           /usr/local/sbin/mailq
+newaliases      /usr/local/sbin/newaliases
 ```
 
 ---
 
-## 2) Desactivar sendmail, activar Postfix/Dovecot
+## 2) Crear usuarios del sistema
 
 ```sh
-# Desactivar todos los demonios de sendmail (base)
-sysrc sendmail_enable="NO"
-sysrc sendmail_submit_enable="NO"
-sysrc sendmail_outbound_enable="NO"
-sysrc sendmail_msp_queue_enable="NO"
+pw useradd -n roberto   -m -s /bin/sh && passwd roberto
+pw useradd -n francisco -m -s /bin/sh && passwd francisco
+pw useradd -n mauricio  -m -s /bin/sh && passwd mauricio
 
-# Activar Postfix y Dovecot al arrancar
-sysrc postfix_enable="YES"
-sysrc dovecot_enable="YES"
-
-# mailer.conf -> que 'sendmail/newaliases' apunten a Postfix
-cp /usr/local/share/postfix/mailer.conf /etc/mail/mailer.conf
+# (Opcional) Pre-crear Maildir
+su - roberto   -c 'mkdir -p ~/Maildir/{cur,new,tmp}'
+su - francisco -c 'mkdir -p ~/Maildir/{cur,new,tmp}'
+su - mauricio  -c 'mkdir -p ~/Maildir/{cur,new,tmp}'
 ```
 
 ---
 
-## 3) Identidad local y hosts (solo en el **servidor**)
+## 3) Alias/grupos
 
-> Usamos **FQDN local**; el **cliente** usará **IP directa**, sin tocar `hosts` en Windows.
+Edita **/etc/mail/aliases**:
 
-```sh
-# Hostname del sistema
-sysrc hostname="mail.jmrd.local"
-service hostname restart
+```
+# Usuarios
+roberto:    roberto
+francisco:  francisco
+mauricio:   mauricio
 
-# /etc/hosts (NO mezclar 'localhost' con la IP real)
-cat > /etc/hosts <<EOF
-127.0.0.1       localhost
-# Sustituye por TU IP real alcanzable desde Windows:
-192.168.56.10   mail.jmrd.local mail
-EOF
+# Listas
+avisos:     roberto, francisco, mauricio
+sistemas:   roberto, francisco
+otro:       mauricio
 ```
 
-*(Evita poner `localhost` en la misma línea de la IP — clásico error.)* 
-
----
-
-## 4) Postfix (SMTP 25, sin AUTH, entrega local)
+Compila:
 
 ```sh
-# Fichero principal: /usr/local/etc/postfix/main.cf  (usamos postconf -e)
-postfix set-permissions   # opcional, normaliza permisos
-
-postconf -e "myhostname=mail.jmrd.local"
-postconf -e "mydomain=jmrd.local"
-postconf -e "myorigin=jmrd.local"
-postconf -e "mydestination=\$myhostname, \$mydomain, localhost.\$mydomain, localhost"
-postconf -e "inet_interfaces=all"
-postconf -e "inet_protocols=ipv4"
-postconf -e "home_mailbox=Maildir/"
-postconf -e "mynetworks=127.0.0.0/8"
-postconf -e "smtpd_relay_restrictions=permit_mynetworks, reject_unauth_destination"
-
-# Alias del sistema (minimos recomendados)
-grep -q '^postmaster:' /etc/aliases || cat >> /etc/aliases <<'EOF'
-postmaster: root
-root:       juan
-avisos:     juan, maria
-EOF
-
 newaliases
+```
+
+---
+
+## 4) Configurar **Postfix** (SMTP local + acceso desde la IP de la VM)
+
+Queremos que Thunderbird pueda conectarse al **SMTP de la VM** usando la **IP** (servidor de salida), pero que **solo acepte destinatarios del propio dominio/local** y **rechace** relé hacia dominios externos. Además, entrega en **Maildir**.
+
+> Sustituye **VM_IP** y **LAB_CIDR** por tus valores reales.
+
+```sh
+# Identidad y dominios locales
+postconf -e "myhostname = jmrd.com"
+postconf -e "mydomain = jmrd.com"
+postconf -e "myorigin = \$mydomain"
+
+# Escuchar en la IP de la VM (y en todas) para que Thunderbird pueda usarla
+postconf -e "inet_interfaces = all"
+postconf -e "inet_protocols = ipv4"
+
+# Destinos que este Postfix considera "locales"
+postconf -e "mydestination = \$myhostname, localhost.\$mydomain, localhost, \$mydomain"
+
+# Entrega en Maildir bajo $HOME
+postconf -e "home_mailbox = Maildir/"
+
+# Alias locales
+postconf -e "alias_maps = hash:/etc/mail/aliases"
+postconf -e "alias_database = hash:/etc/mail/aliases"
+
+# --- Seguridad mínima y límites de alcance ---
+
+# 1) Solo clientes de tu LAN pueden abrir sesión SMTP (el resto se rechaza)
+postconf -e "mynetworks = 127.0.0.0/8, LAB_CIDR"
+postconf -e "smtpd_client_restrictions = permit_mynetworks, reject"
+
+# 2) No relé a dominios externos: acepta solo destinatarios locales
+postconf -e "smtpd_relay_restrictions = reject_unauth_destination"
+
+# 3) Rechazar destinatarios inexistentes localmente (evita colas inútiles)
+postconf -e "local_recipient_maps = unix:passwd.byname \$alias_maps"
+
+# 4) Sin TLS (laboratorio; para que TB use “Sin cifrado”)
+postconf -e "smtpd_tls_security_level = none"
+
 service postfix restart
 ```
 
-> Con esto, **solo** se entrega a destinatarios **locales** `@jmrd.local`. Se **rechaza** relé externo (por `reject_unauth_destination`). Igual que en Ubuntu LAB. 
+> Con esto, **Thunderbird** podrá **enviar** al SMTP de la VM **solo** a cuentas/alias locales de `jmrd.com`. Si alguien intenta `usuario@otrodominio.com`, será **rechazado** en RCPT (no hace relé).
+
+> **¿Quieres “solo recibir” sin que Thunderbird pueda enviar?** En ese caso, cambia:
+>
+> ```
+> postconf -e "inet_interfaces = loopback-only"
+> service postfix restart
+> ```
+>
+> y Thunderbird **no** podrá usar la IP para SMTP. (Tú decides; por tu última petición te dejo habilitado el SMTP en la IP de la VM.)
 
 ---
 
-## 5) Dovecot (IMAP 143, en claro)
+## 5) Configurar **Dovecot** (IMAP/POP3 sin TLS, solo lab)
 
-Ficheros en `/usr/local/etc/dovecot/`:
+Copia la config de ejemplo si aún no existe:
 
 ```sh
-# /usr/local/etc/dovecot/dovecot.conf
-printf '%s\n' '!include conf.d/*.conf' 'protocols = imap' 'listen = *' > /usr/local/etc/dovecot/dovecot.conf
+[ -f /usr/local/etc/dovecot/dovecot.conf ] || \
+  cp -R /usr/local/etc/dovecot/example-config/* /usr/local/etc/dovecot/
+```
 
-# /usr/local/etc/dovecot/conf.d/10-mail.conf
-sed -i '' 's|^#\?mail_location.*|mail_location = maildir:~/Maildir|' /usr/local/etc/dovecot/conf.d/10-mail.conf
+Ajustes mínimos:
 
-# /usr/local/etc/dovecot/conf.d/10-auth.conf
-sed -i '' 's/^#\?disable_plaintext_auth.*/disable_plaintext_auth = no/' /usr/local/etc/dovecot/conf.d/10-auth.conf
-sed -i '' 's/^#\?auth_mechanisms.*/auth_mechanisms = plain login/' /usr/local/etc/dovecot/conf.d/10-auth.conf
+* **/usr/local/etc/dovecot/conf.d/10-mail.conf**
 
-# /usr/local/etc/dovecot/conf.d/10-ssl.conf
-sed -i '' 's/^#\?ssl = .*/ssl = no/' /usr/local/etc/dovecot/conf.d/10-ssl.conf
+```
+mail_location = maildir:~/Maildir
+```
 
+* **/usr/local/etc/dovecot/conf.d/10-ssl.conf**
+
+```
+ssl = no
+```
+
+* **/usr/local/etc/dovecot/conf.d/10-auth.conf**
+
+```
+disable_plaintext_auth = no
+auth_mechanisms = plain login
+```
+
+* **/usr/local/etc/dovecot/dovecot.conf** (asegúrate de escuchar en todas las IP)
+
+```
+listen = *
+protocols = imap pop3
+```
+
+Reinicia:
+
+```sh
 service dovecot restart
 ```
 
 ---
 
-## 6) Usuarios y Maildir (rutas absolutas + permisos por usuario)
+## 6) Comprobaciones rápidas
 
 ```sh
-# Cuentas de ejemplo
-pw useradd -n juan -m -s /bin/sh && passwd juan
-pw useradd -n maria -m -s /bin/sh && passwd maria
+# Ver puertos escuchando (25 SMTP, 110 POP3, 143 IMAP en 0.0.0.0)
+sockstat -4 -l | egrep '(:25|:110|:143)'
 
-# Inicializar Maildir (estructura mínima)
-mkdir -p /home/juan/Maildir/{cur,new,tmp}
-mkdir -p /home/maria/Maildir/{cur,new,tmp}
-chmod -R 700 /home/juan/Maildir /home/maria/Maildir
-chown -R juan:juan /home/juan/Maildir
-chown -R maria:maria /home/maria/Maildir
+# Postfix efectivo
+postconf -n | egrep '^(myhostname|mydomain|myorigin|inet_interfaces|inet_protocols|mydestination|home_mailbox|mynetworks|smtpd_client_restrictions|smtpd_relay_restrictions|local_recipient_maps|smtpd_tls_security_level)'
+
+# Dovecot efectivo
+doveconf -n | egrep '^(listen|protocols|mail_location|ssl|disable_plaintext_auth|auth_mechanisms)'
 ```
-
-*(Las rutas absolutas y permisos por usuario evitan errores de propiedad/expansión. Igual que en la guía de Ubuntu.)* 
 
 ---
 
-## 7) Verificación rápida (servidor)
+## 7) Prueba de entrega interna (desde el servidor)
 
 ```sh
-# Puertos
-sockstat -4 -l | egrep '(:25|:143)'
+printf "Hola Roberto.\n"          | mail -s "Prueba usuario" roberto@jmrd.com
+printf "Aviso para sistemas.\n"   | mail -s "Prueba lista"   sistemas@jmrd.com
+printf "Mensaje general.\n"       | mail -s "Prueba avisos"  avisos@jmrd.com
 
-# Autenticación IMAP (texto claro)
-doveadm auth test juan
-doveadm auth test maria
-
-# Envío local (Juan -> María)
-printf "Subject: Test A->B\n\nHola Maria\n" | sendmail -v maria@jmrd.local
 tail -n 50 /var/log/maillog
 ```
 
-**Esperado:** `status=sent (delivered to mailbox)`.
+---
+
+## 8) Configurar **Thunderbird** usando **la IP de la VM** (entrante y salida)
+
+> Sustituye `VM_IP` por tu IP real (ej. `192.168.100.10`).
+
+**Cuenta de correo (por ejemplo, Roberto)**
+
+* **Nombre**: Roberto
+* **Dirección de correo**: `roberto@jmrd.com`
+* **Nombre de usuario** (login): `roberto`
+* **Contraseña**: la de la cuenta del sistema
+
+**Servidor entrante (IMAP recomendado)**
+
+* Servidor: `VM_IP`
+* Puerto: **143**
+* Conexión: **Ninguna**
+* Autenticación: **Contraseña normal**
+
+*(Si prefieres POP3: puerto **110**, misma seguridad y autenticación.)*
+
+**Servidor de salida (SMTP)**
+
+* Servidor: `VM_IP`
+* Puerto: **25**
+* Conexión: **Ninguna**
+* Autenticación: **Ninguna** (como estás dentro de **LAB_CIDR**, Postfix te dejará entregar **solo** a `@jmrd.com`)
+
+**Prueba desde Thunderbird**
+
+* Enviar a: `francisco@jmrd.com`, `avisos@jmrd.com`, etc.
+* Recibir con IMAP/POP3 y verifica que llegan a las bandejas correctas.
 
 ---
 
-## 8) Thunderbird en Windows (con **IP** directa)
+## 9) Bloques “todo en uno” (para ir más rápido)
 
-1. Asegúrate de que el Windows llega a la IP de la VM (misma red Host‑Only/Bridged).
-2. **Crear cuenta** → **Configuración manual**:
-
-   * **IMAP**: **Servidor = <IP de la VM>**, **Puerto 143**, **Seguridad: Ninguna**, **Auth: Contraseña normal**, **Usuario: juan**.
-   * **SMTP**: **Servidor = <IP de la VM>**, **Puerto 25**, **Seguridad: Ninguna**, **Auth: Sin autenticación**.
-3. **Probar**: enviar desde `juan@jmrd.local` a `maria@jmrd.local`; en la cuenta de María, **Recibir**.
-
-> Si la IP del FreeBSD cambia, **solo** actualiza esa IP en Thunderbird (no hay que tocar el servidor).
-
----
-
-## 9) Diagnóstico útil
+> Edita las variables **VM_IP** y **LAB_CIDR** antes de pegar.
 
 ```sh
-# Logs en vivo
-tail -f /var/log/maillog
+# === VARIABLES ===
+VM_IP="192.168.100.10"           # <-- cambia por la IP real de tu VM
+LAB_CIDR="192.168.100.0/24"      # <-- cambia por tu subred real
+DOMAIN="jmrd.com"
 
-# Ver buzones
-ls -la /home/juan/Maildir/new/
-ls -la /home/maria/Maildir/new/
+# === HOSTNAME (opcional) ===
+sysrc hostname="$DOMAIN"
+hostname "$DOMAIN"
 
-# Conectividad desde Windows (opcional)
-#   telnet <IP> 25
-#   telnet <IP> 143
+# === PAQUETES ===
+pkg update
+pkg install -y postfix dovecot
+
+# === ACTIVAR SERVICIOS ===
+sysrc postfix_enable=YES
+sysrc dovecot_enable=YES
+
+# === mailer.conf -> Postfix ===
+cat > /etc/mail/mailer.conf <<'EOF'
+sendmail        /usr/local/sbin/sendmail
+send-mail       /usr/local/sbin/sendmail
+mailq           /usr/local/sbin/mailq
+newaliases      /usr/local/sbin/newaliases
+EOF
+
+# === USUARIOS ===
+for u in roberto francisco mauricio; do
+  id "$u" >/dev/null 2>&1 || pw useradd -n "$u" -m -s /bin/sh
+  su - "$u" -c 'mkdir -p ~/Maildir/{cur,new,tmp}'
+done
+echo ">>> Establece contraseñas con:  passwd roberto|francisco|mauricio"
+
+# === ALIASES ===
+cat > /etc/mail/aliases <<'EOF'
+postmaster: root
+root:       root
+
+roberto:    roberto
+francisco:  francisco
+mauricio:   mauricio
+
+avisos:     roberto, francisco, mauricio
+sistemas:   roberto, francisco
+otro:       mauricio
+EOF
+newaliases
+
+# === POSTFIX ===
+postconf -e "myhostname = $DOMAIN"
+postconf -e "mydomain = $DOMAIN"
+postconf -e "myorigin = \$mydomain"
+
+postconf -e "inet_interfaces = all"
+postconf -e "inet_protocols = ipv4"
+postconf -e "mydestination = \$myhostname, localhost.\$mydomain, localhost, \$mydomain"
+postconf -e "home_mailbox = Maildir/"
+postconf -e "alias_maps = hash:/etc/mail/aliases"
+postconf -e "alias_database = hash:/etc/mail/aliases"
+
+postconf -e "mynetworks = 127.0.0.0/8, $LAB_CIDR"
+postconf -e "smtpd_client_restrictions = permit_mynetworks, reject"
+postconf -e "smtpd_relay_restrictions = reject_unauth_destination"
+postconf -e "local_recipient_maps = unix:passwd.byname \$alias_maps"
+postconf -e "smtpd_tls_security_level = none"
+
+service postfix restart
+
+# === DOVECOT ===
+[ -f /usr/local/etc/dovecot/dovecot.conf ] || \
+  cp -R /usr/local/etc/dovecot/example-config/* /usr/local/etc/dovecot/
+
+sed -i '' -e 's|^#\?listen =.*|listen = *|' \
+          -e 's|^#\?protocols =.*|protocols = imap pop3|' /usr/local/etc/dovecot/dovecot.conf
+
+sed -i '' -e 's|^#\?mail_location =.*|mail_location = maildir:~/Maildir|' \
+          /usr/local/etc/dovecot/conf.d/10-mail.conf
+
+sed -i '' -e 's|^#\?ssl =.*|ssl = no|' \
+          /usr/local/etc/dovecot/conf.d/10-ssl.conf
+
+sed -i '' -e 's|^#\?disable_plaintext_auth =.*|disable_plaintext_auth = no|' \
+          -e 's|^#\?auth_mechanisms =.*|auth_mechanisms = plain login|' \
+          /usr/local/etc/dovecot/conf.d/10-auth.conf
+
+service dovecot restart
+
+# === CHEQUEOS ===
+echo ">>> Puertos abiertos (25/110/143):"
+sockstat -4 -l | egrep '(:25|:110|:143)'
+
+echo ">>> Postfix:"
+postconf -n | egrep '^(myhostname|mydomain|inet_interfaces|mydestination|mynetworks|smtpd_client_restrictions|smtpd_relay_restrictions|home_mailbox)'
+
+echo ">>> Dovecot:"
+doveconf -n | egrep '^(listen|protocols|mail_location|ssl|disable_plaintext_auth)'
+
+echo ">>> Envía pruebas:"
+echo 'printf "Hola.\n" | mail -s "Prueba" avisos@jmrd.com'
 ```
 
 ---
 
-### Notas finales
+## 10) Variantes y notas útiles
 
-* **Seguridad mínima**: IMAP 143 en claro + SMTP 25 sin AUTH (solo entrega local).
-* **Sin tocar Windows hosts**: el cliente usa la **IP**.
-* **No open relay**: bloqueado por `reject_unauth_destination`.
-* **Buenas prácticas mínimas**: alias `postmaster/root`, Maildir con permisos 700, revisar `maillog`.
-* Esta guía es la **versión FreeBSD** de tu laboratorio en Ubuntu, con los mismos principios y correcciones clave. 
+* **Solo recepción (bloquear envío desde Thunderbird):**
+  Cambia `inet_interfaces = loopback-only` y reinicia Postfix. Listo.
+* **Permitir envío, pero con usuario/contraseña (SASL via Dovecot):**
+  No es “mínimo”, pero si quisieras, se habilita `smtpd_sasl_type = dovecot`, `smtpd_sasl_path = private/auth`, `smtpd_sasl_auth_enable = yes` y en Dovecot el socket `auth` para Postfix. (Puedo darte la receta si te interesa endurecer un poco.)
+* **TLS para IMAP/POP3/SMTP (IMAPS/POP3S/Submission 587):**
+  Solo si sales del lab. Requiere certificados (self‑signed u otros) y cambiar `ssl = yes` en Dovecot y los listeners `submission` en Postfix.
+
+---
+
+### ¿Qué queda listo con esto?
+
+* Cuentas **roberto**, **francisco**, **mauricio** con buzón **Maildir**.
+* Alias **avisos**, **sistemas**, **otro**.
+* **Dovecot** sirviendo **IMAP (143)** y **POP3 (110)** sin TLS.
+* **Postfix** escuchando en **VM_IP:25**, aceptando **solo** clientes de tu **LAB_CIDR** y **solo** destinatarios locales `@jmrd.com`.
+* **Thunderbird** apunta a la **IP** de la VM como servidor entrante y de salida.
+
+Si me dices **cuál es la IP real de tu VM** y **cuál es tu subred**, te devuelvo el bloque “todo en uno” ya **rellenado** para copiar/pegar sin tocar nada.
