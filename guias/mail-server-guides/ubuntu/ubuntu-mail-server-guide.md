@@ -28,7 +28,6 @@ ip a show ens4
 ### Configurar IP estática en ens4
 ```bash
 sudo nano /etc/netplan/01-netcfg.yaml
-sudo chmod 600 /etc/netplan/01-netcfg.yaml
 ```
 
 **Configuración específica para JMRD.lab:**
@@ -50,6 +49,7 @@ network:
 
 ### Aplicar configuración
 ```bash
+sudo chmod 600 /etc/netplan/01-netcfg.yaml
 sudo netplan apply
 ```
 
