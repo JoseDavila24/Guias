@@ -1,272 +1,389 @@
-# Guía “LAB sin seguridad” (Postfix + Dovecot) **con IP directa en el cliente**
+# Guía Completa: Servidor Ubuntu con DHCP + Correos Pasivos
 
-**Entorno previsto**
-
-* **Virtualización:** Multipass
-* **Ubuntu:** 24.04 LTS (VM recién creada, IP por DHCP)
-* **Dominio interno:** `jmrd.com`
-* **FQDN del servidor:** `mail.jmrd.com` (para identidad local; **Thunderbird usará la IP**)
-
-> **Modo laboratorio:** sin TLS/STARTTLS y **sin SMTP AUTH**. **No** exponer a Internet.
-
----
-
-## 0) Crear VM y anotar la IP
-
-En **Windows** (PowerShell/CMD):
-
-```bash
-multipass launch 24.04 --name correo --cpus 2 --memory 2G --disk 10G
-multipass info correo
-# Anota la IPv4 (ej. 172.21.X.Y)
-```
-
-> Esa IP la pondrás en Thunderbird como “Nombre del servidor” IMAP y SMTP (no usaremos `hosts` en Windows).
+## 📋 Tabla de Contenidos
+1. [Configuración Inicial del Servidor](#configuración-inicial)
+2. [Configuración de Red e IP Estática](#configuración-de-red)
+3. [Instalación y Configuración DHCP](#servidor-dhcp)
+4. [Instalación y Configuración de Correo](#servidor-de-correo)
+5. [Configuración de Clientes Lubuntu](#clientes-lubuntu)
+6. [Pruebas y Verificación](#pruebas)
 
 ---
 
-## 1) Preparación básica dentro de la VM
+## 1. 🛠 Configuración Inicial del Servidor
 
-Entrar a la VM:
-
+### Actualizar sistema
 ```bash
-multipass shell correo
+sudo apt update && sudo apt upgrade -y
+sudo apt install net-tools
 ```
 
-Identidad del host/MTA:
-
+### Ver interfaces de red
 ```bash
-sudo hostnamectl set-hostname mail.jmrd.com
-echo jmrd.com | sudo tee /etc/mailname
+ip a
 ```
-
-`/etc/hosts` **solo local** (no dependemos de la IP de la NIC):
-
-```bash
-# ⚠️ No mezcles 'localhost' con el FQDN en la misma línea
-sudo bash -c 'cat >/etc/hosts <<EOF
-127.0.0.1   localhost
-127.0.1.1   mail.jmrd.com mail
-EOF'
-```
-
-> Mantener `localhost` en 127.0.0.1 evita errores de resolución. 
+**Anota el nombre de tu interfaz** (ej: ens33, eth0, enp0s3)
 
 ---
 
-## 2) Instalar paquetes
+## 2. 🌐 Configuración de Red e IP Estática
 
+### Configurar IP estática
 ```bash
-sudo apt update && sudo apt -y upgrade
-sudo apt -y install postfix dovecot-imapd mailutils
+sudo nano /etc/netplan/01-netcfg.yaml
 ```
 
-Durante Postfix:
+**Ejemplo de configuración:**
+```yaml
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    ens33:  # ¡CAMBIAR POR TU INTERFAZ!
+      dhcp4: no
+      addresses: [192.168.1.1/24]
+      gateway4: 192.168.1.1
+      nameservers:
+        addresses: [8.8.8.8, 8.8.4.4]
+        search: [local.lan]
+```
 
-* Tipo: **Internet Site**
-* System mail name: **jmrd.com**
+### Aplicar configuración
+```bash
+sudo netplan apply
+```
+
+### Verificar IP
+```bash
+ip a show ens33
+```
 
 ---
 
-## 3) Postfix (SMTP) — mínimo, sin AUTH (no open relay)
+## 3. 🔌 Servidor DHCP
 
-> **Importante:** No crear *overrides* de systemd. Usaremos la unidad de paquete tal como viene.
-
-Ajustar parámetros con `postconf -e`:
-
+### Instalar DHCP Server
 ```bash
-# Identidad
-sudo postconf -e "myhostname=mail.jmrd.com"
-sudo postconf -e "mydomain=jmrd.com"
-sudo postconf -e "myorigin=jmrd.com"   # explícito para evitar confusión
-sudo postconf -e "mydestination=\$myhostname, \$mydomain, localhost.\$mydomain, localhost"
-
-# Red / protocolos
-sudo postconf -e "inet_interfaces=all"
-sudo postconf -e "inet_protocols=ipv4"
-
-# Buzones Maildir
-sudo postconf -e "home_mailbox=Maildir/"
-
-# Alias
-sudo postconf -e "alias_maps=hash:/etc/aliases"
-sudo postconf -e "alias_database=hash:/etc/aliases"
-
-# Anti‑relé (lab sin AUTH): entrega local permitida; relé externo bloqueado
-sudo postconf -e "mynetworks=127.0.0.0/8"
-sudo postconf -e "smtpd_relay_restrictions=permit_mynetworks, reject_unauth_destination"
-
-# Aplicar mapas de alias
-sudo newaliases
-
-# Preferir 'reload' (idempotente) para evitar "already running"
-sudo systemctl enable --now postfix
-sudo systemctl reload postfix
-sudo postconf -n | sed -n '1,200p'
+sudo apt install isc-dhcp-server -y
 ```
 
-> **Nota:** `myorigin=/etc/mailname` es **válido** (Postfix acepta rutas que contienen el dominio), pero aquí usamos `myorigin=jmrd.com` para simplificar. Si otro día prefieres `/etc/mailname`, asegúrate de que su contenido sea exactamente `jmrd.com`.
+### Configurar interfaz DHCP
+```bash
+sudo nano /etc/default/isc-dhcp-server
+```
 
-> **Si alguna vez creaste un override** en `/etc/systemd/system/postfix.service.d/`: bórralo y recarga demonios:
-> `sudo rm -rf /etc/systemd/system/postfix.service.d && sudo systemctl daemon-reload && sudo systemctl reset-failed postfix && sudo systemctl reload postfix`
+**Configurar:**
+```
+INTERFACESv4="ens33"  # ¡TU INTERFAZ!
+INTERFACESv6=""
+```
+
+### Configurar dhcpd.conf
+```bash
+sudo cp /etc/dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf.backup
+sudo nano /etc/dhcp/dhcpd.conf
+```
+
+**Agregar esta configuración:**
+```
+# CONFIGURACIÓN GLOBAL
+option domain-name "local.lan";
+option domain-name-servers 8.8.8.8, 8.8.4.4;
+default-lease-time 600;
+max-lease-time 7200;
+authoritative;
+
+# SUBNET PRINCIPAL
+subnet 192.168.1.0 netmask 255.255.255.0 {
+    range 192.168.1.100 192.168.1.200;
+    option routers 192.168.1.1;
+    option subnet-mask 255.255.255.0;
+    option broadcast-address 192.168.1.255;
+    option domain-name-servers 8.8.8.8, 8.8.4.4;
+}
+
+# RESERVAS OPCIONALES (para IPs fijas)
+host pc-lubuntu-1 {
+    hardware ethernet xx:xx:xx:xx:xx:xx;  # MAC PC1
+    fixed-address 192.168.1.10;
+}
+
+host pc-lubuntu-2 {
+    hardware ethernet yy:yy:yy:yy:yy:yy;  # MAC PC2
+    fixed-address 192.168.1.11;
+}
+```
+
+### Habilitar e iniciar DHCP
+```bash
+sudo systemctl start isc-dhcp-server
+sudo systemctl enable isc-dhcp-server
+sudo systemctl status isc-dhcp-server
+```
 
 ---
 
-## 4) Dovecot (IMAP) — texto claro (sin TLS)
+## 4. 📧 Servidor de Correo Pasivo
+
+### Instalar Postfix y Dovecot
+```bash
+sudo apt install postfix postfix-mysql dovecot-imapd dovecot-pop3d mailutils -y
+```
+
+### Durante instalación de Postfix:
+- **Tipo de correo**: "Sitio de Internet"
+- **Nombre del sistema**: `local.lan` (o el que prefieras)
+- **Destinos**: Acepta los valores por defecto
+
+### Configurar Postfix
+```bash
+sudo nano /etc/postfix/main.cf
+```
+
+**Configuración completa:**
+```
+# CONFIGURACIÓN BÁSICA
+myhostname = servidor.local.lan
+mydomain = local.lan
+myorigin = $mydomain
+inet_interfaces = all
+inet_protocols = all
+
+# CONTROL DE DESTINOS
+mydestination = $myhostname, localhost.$mydomain, localhost, $mydomain
+
+# POLÍTICAS DE RED
+mynetworks = 127.0.0.0/8 192.168.1.0/24
+relay_domains = 
+home_mailbox = Maildir/
+
+# SEGURIDAD
+smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination
+```
+
+### Configurar Dovecot
+```bash
+sudo nano /etc/dovecot/dovecot.conf
+```
+
+**Agregar:**
+```
+protocols = imap pop3
+listen = *
+mail_location = maildir:~/Maildir
+disable_plaintext_auth = no
+```
 
 ```bash
-# Buzones Maildir
-sudo sed -i 's|^#\?mail_location.*|mail_location = maildir:~/Maildir|' /etc/dovecot/conf.d/10-mail.conf
+sudo nano /etc/dovecot/conf.d/10-auth.conf
+```
+```
+auth_mechanisms = plain login
+!include auth-system.conf.ext
+```
 
-# Autenticación en claro (solo laboratorio)
-sudo sed -i 's/^#\?disable_plaintext_auth.*/disable_plaintext_auth = no/' /etc/dovecot/conf.d/10-auth.conf
-sudo sed -i 's/^#\?auth_mechanisms.*/auth_mechanisms = plain login/' /etc/dovecot/conf.d/10-auth.conf
+```bash
+sudo nano /etc/dovecot/conf.d/10-mail.conf
+```
+```
+mail_location = maildir:~/Maildir
+```
 
-# Desactivar TLS/STARTTLS explícitamente
-sudo sed -i 's/^#\?ssl = .*/ssl = no/' /etc/dovecot/conf.d/10-ssl.conf
+### Crear usuarios de correo
+```bash
+# Crear usuarios (repetir para cada usuario)
+sudo adduser usuario1
+sudo adduser usuario2
 
-sudo systemctl enable --now dovecot
+# Establecer contraseñas
+sudo passwd usuario1
+sudo passwd usuario2
+```
+
+### Habilitar servicios de correo
+```bash
+sudo systemctl restart postfix
 sudo systemctl restart dovecot
-sudo doveconf -n | sed -n '1,200p'
+sudo systemctl enable postfix
+sudo systemctl enable dovecot
 ```
 
 ---
 
-## 5) Usuarios y Maildir  **(rutas absolutas y permisos por usuario)**
+## 5. 🔧 Configuración de Firewall
 
 ```bash
-# Usuarios de prueba
-sudo adduser juan
-sudo adduser maria
+# Instalar UFW si no está
+sudo apt install ufw -y
 
-# Crear Maildir con rutas absolutas (evita fallos de expansión)
-sudo -u juan  maildirmake.dovecot /home/juan/Maildir
-sudo -u maria maildirmake.dovecot /home/maria/Maildir
+# Configurar reglas
+sudo ufw allow 22/tcp                    # SSH
+sudo ufw allow 67/udp                    # DHCP
+sudo ufw allow 25/tcp                    # SMTP
+sudo ufw allow 110/tcp                   # POP3
+sudo ufw allow 143/tcp                   # IMAP
+sudo ufw allow from 192.168.1.0/24       # Red local
 
-# Permisos y propiedad (por usuario)
-sudo chmod -R 700 /home/juan/Maildir
-sudo chmod -R 700 /home/maria/Maildir
-sudo chown -R juan:juan   /home/juan/Maildir
-sudo chown -R maria:maria /home/maria/Maildir
-```
-
----
-
-## 6) Alias internos (útiles)
-
-```bash
-sudo tee -a /etc/aliases > /dev/null << 'EOF'
-postmaster: juan
-root: juan
-avisos: juan, maria
-soporte: juan
-direccion: maria
-EOF
-
-sudo newaliases
-sudo postfix reload
-```
-
-> Redirigir **postmaster/root** a un buzón real evita perder avisos. 
-
----
-
-## 7) Verificaciones en el servidor
-
-```bash
-# Servicios y puertos
-systemctl --no-pager status postfix dovecot
-ss -lntp | grep -E ':25|:143'
-
-# Autenticación Dovecot
-sudo doveadm auth test juan
-sudo doveadm auth test maria
-
-# Entrega local (Juan → María)
-printf "Subject: Test Local\n\nHola Maria\n" | sendmail -v maria@jmrd.com
-sudo tail -n 80 /var/log/mail.log | tail
-# Esperado: "status=sent (delivered to mailbox)"
-```
-
----
-
-## 8) Configurar **Thunderbird** usando **la IP** (sin tocar `hosts`)
-
-1. En Windows, obtén la IP:
-
-   ```bash
-   multipass info correo
-   ```
-2. En **Thunderbird** → **☰ → Nueva → Cuenta de correo existente → Configuración manual**.
-   Usa **la IP** como “Servidor” (IMAP y SMTP):
-
-| Parámetro     | IMAP (entrante)   | SMTP (saliente)                |
-| ------------- | ----------------- | ------------------------------ |
-| **Servidor**  | **<IP de la VM>** | **<IP de la VM>**              |
-| **Puerto**    | **143**           | **25**                         |
-| **Seguridad** | **Ninguna**       | **Ninguna**                    |
-| **Auth**      | Contraseña normal | **Sin autenticación**          |
-| **Usuario**   | juan              | *(se ignora en SMTP sin AUTH)* |
-
-**Prueba:** desde `juan@jmrd.com` envía a `maria@jmrd.com`; en la cuenta de María pulsa **Recibir**.
-En el servidor:
-
-```bash
-sudo tail -n 50 /var/log/mail.log | grep maria
-```
-
-> **SMTP 25 sin AUTH** permite envíos al dominio local `@jmrd.com` y **bloquea relé externo** por `reject_unauth_destination`.
-
----
-
-## 9) Diagnóstico rápido (útil)
-
-```bash
-# Conectividad (instala netcat si hace falta)
-sudo apt -y install netcat-openbsd
-nc -vz 127.0.0.1 25
-nc -vz 127.0.0.1 143
-
-# Logs en vivo
-sudo tail -f /var/log/mail.log
-sudo journalctl -u dovecot -f
-
-# Buzones y permisos
-ls -la /home/juan/Maildir
-ls -la /home/maria/Maildir
-```
-
-**Problemas típicos y solución**
-
-* **“already running” al reiniciar Postfix:** usa `sudo postfix status`; luego `sudo systemctl reload postfix` (idempotente). Si alguna vez creaste un *override*, elimínalo como arriba.
-* **No llega al buzón:** verifica `/etc/hosts`, existencia de `Maildir` y permisos (700).
-* **Thunderbird no conecta:** confirma `ssl = no` en Dovecot y **Seguridad: Ninguna** en el cliente.
-* **Alias no funciona:** faltó `sudo newaliases`.
-
----
-
-## 10) (Opcional) UFW
-
-```bash
-sudo ufw allow 25,143/tcp
+# Habilitar firewall
 sudo ufw enable
-sudo ufw status
 ```
 
 ---
 
-## 11) Si la IP cambia otra vez
+## 6. 💻 Configuración de Clientes Lubuntu
 
-* No toques el servidor.
-* En **Thunderbird**, edita la cuenta y **sustituye la IP** en IMAP/SMTP.
-* Vuelve a probar envío y recepción.
+### Configuración de red en clientes
+1. **Ir a Configuración → Red**
+2. **Configurar como DHCP/Automático**
+3. **Verificar que obtienen IP del rango 192.168.1.100-200**
+
+### Instalar Sylpheed en clientes
+```bash
+sudo apt update
+sudo apt install sylpheed -y
+```
+
+### Configurar Sylpheed para SOLO RECIBIR
+
+#### Para cuenta IMAP (Recomendado):
+1. **Abrir Sylpheed → Cuenta → Agregar**
+2. **Recepción:**
+   - Nombre: `usuario1`
+   - Protocolo: **IMAP**
+   - Servidor: `192.168.1.1`
+   - Usuario: `usuario1`
+   - Contraseña: `contraseña-de-usuario1`
+   - Puerto: `143`
+
+3. **Envío:**
+   - **DEJAR TODO VACÍO**
+   - No configurar servidor SMTP
+   - No marcar "Usar SMTP"
+
+#### Deshabilitar envío completo:
+```
+Configuración → Preferencias → Composición de correo
+```
+- Desmarcar: "Guardar copia en carpeta Enviados"
+- Desmarcar: "Enviar correo inmediatamente"
 
 ---
 
-### ✅ Resumen
+## 7. 🧪 Pruebas y Verificación
 
-* **LAB sin seguridad:** IMAP 143 en claro + SMTP 25 sin AUTH (solo entrega local `@jmrd.com`).
-* **Postfix sin overrides:** usamos `reload` para aplicar cambios (evita el “already running”).
-* **Maildir robusto:** rutas absolutas + permisos/propiedad por usuario.
-* **Thunderbird:** usa **IP directa** (no se modifica `hosts` en Windows).
-* Guía corregida partiendo de tu documento original. 
+### Probar DHCP
+```bash
+# En servidor ver leases
+sudo cat /var/lib/dhcp/dhcpd.leases
+
+# En servidor ver logs
+sudo tail -f /var/log/syslog | grep dhcp
+
+# En cliente ver IP asignada
+ip a
+```
+
+### Probar servicios de correo
+```bash
+# Ver servicios activos
+sudo systemctl status postfix
+sudo systemctl status dovecot
+sudo systemctl status isc-dhcp-server
+
+# Ver puertos abiertos
+sudo netstat -tlnp | grep -E ':25|:110|:143|:67'
+```
+
+### Enviar correo de prueba
+```bash
+# Desde el servidor
+echo "Este es un correo de prueba" | mail -s "Bienvenido al sistema" usuario1@local.lan
+echo "Correo para usuario 2" | mail -s "Test sistema" usuario2@local.lan
+```
+
+### Verificar correos en servidor
+```bash
+# Verificar buzones
+sudo ls -la /home/usuario1/Maildir/
+sudo ls -la /home/usuario2/Maildir/
+```
+
+---
+
+## 8. 🔄 Comandos Útiles para Mantenimiento
+
+### Reiniciar servicios
+```bash
+sudo systemctl restart isc-dhcp-server postfix dovecot
+```
+
+### Ver logs en tiempo real
+```bash
+# Logs DHCP
+sudo tail -f /var/log/syslog | grep dhcp
+
+# Logs correo
+sudo tail -f /var/log/mail.log
+
+# Logs generales
+sudo journalctl -f
+```
+
+### Estadísticas del sistema
+```bash
+# Clientes DHCP conectados
+dhcp-lease-list
+
+# Correos en cola
+mailq
+
+# Espacio de buzones
+du -sh /home/*/Maildir
+```
+
+---
+
+## 9. 🚨 Solución de Problemas Comunes
+
+### Si DHCP no asigna IPs:
+```bash
+sudo systemctl restart isc-dhcp-server
+sudo netplan apply
+```
+
+### Si correo no funciona:
+```bash
+# Probar conexión local
+telnet localhost 25
+telnet localhost 143
+
+# Verificar configuración
+sudo postfix check
+sudo doveconf -n
+```
+
+### Si clientes no pueden recibir correo:
+- Verificar usuario/contraseña en Sylpheed
+- Verificar que Dovecot está ejecutándose
+- Revisar firewall no bloquea puertos
+
+---
+
+## 📊 Estructura Final del Sistema
+
+```
+Servidor Ubuntu (192.168.1.1)
+├── 🔌 DHCP Server (rango: 192.168.1.100-200)
+├── 📧 Postfix (SMTP - puerto 25) - SOLO ENVÍA
+├── 📨 Dovecot (IMAP/POP3 - puertos 143/110) - SOLO RECIBE
+└── 👥 Usuarios: usuario1, usuario2
+
+Switch
+├── 💻 PC Lubuntu 1 (Sylpheed - usuario1)
+└── 💻 PC Lubuntu 2 (Sylpheed - usuario2)
+```
+
+**¡Sistema completo!** Los clientes:
+- ✅ Obtienen IP automáticamente via DHCP
+- ✅ Pueden recibir correos con Sylpheed
+- ❌ **NO pueden enviar correos** (sistema pasivo)
