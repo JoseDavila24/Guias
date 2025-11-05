@@ -11,6 +11,7 @@ pw groupadd recursoshumanos
 ```bash
 pw useradd brenda -c "Brenda - Recursos Humanos" -m -s /bin/tcsh -G recursoshumanos
 echo "1234" | pw mod user brenda -h 0```
+```
 
 ### 1.3 Crear usuario wendy:
 ```bash
