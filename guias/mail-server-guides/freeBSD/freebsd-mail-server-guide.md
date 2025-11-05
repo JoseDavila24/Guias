@@ -4,10 +4,10 @@
 
 ```bash
 # Configurar keymap español permanente
-sysrc keymap="es.latin1"
+sysrc keymap="es"
 
 # Aplicar cambios inmediatamente
-kbdcontrol -l es.latin1.kbd
+kbdcontrol -l es.kbd
 
 # Verificar
 echo "Prueba teclado: ñáéíóú¿¡"
