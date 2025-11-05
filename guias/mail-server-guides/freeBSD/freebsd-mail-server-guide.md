@@ -106,7 +106,7 @@ EOF
 postconf -e "myhostname = jmrd.com"
 postconf -e "mydomain = jmrd.com"
 postconf -e "myorigin = \$mydomain"
-postconf -e "inet_interfaces = localhost, 172.16.50.10"
+postconf -e "inet_interfaces = localhost, 172.16.50.101"
 postconf -e "inet_protocols = ipv4"
 postconf -e "mydestination = \$myhostname, localhost.\$mydomain, localhost, \$mydomain"
 postconf -e "home_mailbox = Maildir/"
