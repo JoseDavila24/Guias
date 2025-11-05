@@ -3,7 +3,7 @@
 ### 0 Cambiar teclado a es:
 ```bash
 # Configurar keymap permanente
-sysrc keymap="es.latin1"
+sysrc keymap="es"
 
 # Reiniciar el servicio console
 service syscons restart
