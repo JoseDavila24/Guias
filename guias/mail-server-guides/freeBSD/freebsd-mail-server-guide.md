@@ -1,5 +1,14 @@
 ## 🔐 PASO 1: CONFIGURAR SSH (Acceso Remoto)
 
+### 0 Cambiar teclado a es:
+```bash
+# Configurar keymap permanente
+sysrc keymap="es.latin1"
+
+# Reiniciar el servicio console
+service syscons restart
+```
+
 ### 1.1 Activar SSH en el arranque:
 ```bash
 sysrc sshd_enable="YES"
