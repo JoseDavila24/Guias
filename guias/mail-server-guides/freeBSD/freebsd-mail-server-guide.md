@@ -1,4 +1,4 @@
-## 🔐 PASO 1: CONFIGURAR SSH (Acceso Remoto)
+## PASO 0: CONFIGURAR TECLADO
 
 ### 0 Cambiar teclado a es:
 ```bash
@@ -9,31 +9,25 @@ sysrc keymap="es"
 service syscons restart
 ```
 
-### 1.1 Activar SSH en el arranque:
+## 🔐 PASO 1: CONFIGURAR SSH (Acceso Remoto)
+
+### 1. Configurar SSH para root sin seguridad:
 ```bash
 sysrc sshd_enable="YES"
-```
-
-### 1.2 Configurar seguridad SSH:
-```bash
-echo "PermitRootLogin no" >> /etc/ssh/sshd_config
+echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
 echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
-echo "MaxAuthTries 3" >> /etc/ssh/sshd_config
-```
-
-### 1.3 Iniciar servicio:
-```bash
+echo "PermitEmptyPasswords yes" >> /etc/ssh/sshd_config
 service sshd start
 ```
 
-### 1.4 Verificar:
+### 2. Quitar contraseña a root (opcional):
 ```bash
-sockstat -4 -l | grep :22
+passwd -d root
 ```
 
-**✅ Ahora conectate desde otra terminal:**
+### 3. Conectarte desde otra terminal:
 ```bash
-ssh usuario@ip_del_servidor
+ssh root@ip_del_servidor
 ```
 
 ---
