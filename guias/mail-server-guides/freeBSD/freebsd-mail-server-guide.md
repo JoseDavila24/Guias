@@ -1,4 +1,6 @@
-# 🚀 GUÍA FREEBSD - SSH + DHCP + POSTFIX (CORREGIDA)
+🔧 **ENTENDIDO - Configuración corregida:**
+
+# 🚀 GUÍA FREEBSD - SSH + DHCP + POSTFIX (CONFIGURACIÓN CORREGIDA)
 
 ## ⌨️ PASO 0: CONFIGURAR TECLADO ESPAÑOL
 
@@ -24,9 +26,9 @@ echo "PermitEmptyPasswords yes" >> /etc/ssh/sshd_config
 passwd -d root
 ```
 
-### 1.3 Configurar red de administración (vtnet1):
+### 1.3 Configurar vtnet1 para obtener IP por DHCP:
 ```bash
-echo 'ifconfig_vtnet1="inet 10.10.10.10 netmask 255.255.255.0"' >> /etc/rc.conf
+echo 'ifconfig_vtnet1="DHCP"' >> /etc/rc.conf
 service netif restart vtnet1
 ```
 
@@ -37,36 +39,42 @@ service sshd start
 
 ---
 
-## 🌐 PASO 2: CONFIGURAR SERVIDOR DHCP
+## 🌐 PASO 2: CONFIGURAR SERVIDOR DHCP EN VNET0
 
-### 2.1 Instalar DHCP:
+### 2.1 Configurar IP fija para vtnet0 (red 172.16.50.0/24):
+```bash
+echo 'ifconfig_vtnet0="inet 172.16.50.10 netmask 255.255.255.0"' >> /etc/rc.conf
+service netif restart vtnet0
+```
+
+### 2.2 Instalar DHCP:
 ```bash
 pkg install -y isc-dhcp44-server
 ```
 
-### 2.2 Crear configuración DHCP:
+### 2.3 Crear configuración DHCP para red 172.16.50.0/24:
 ```bash
 cat > /usr/local/etc/dhcpd.conf << 'EOF'
 authoritative;
 option domain-name "jmrd.com";
 option domain-name-servers 8.8.8.8, 8.8.4.4;
 option subnet-mask 255.255.255.0;
-option routers 192.168.122.1;
-option broadcast-address 192.168.122.255;
+option routers 172.16.50.1;
+option broadcast-address 172.16.50.255;
 
 default-lease-time 3600;
 max-lease-time 7200;
 
-subnet 192.168.122.0 netmask 255.255.255.0 {
-    range 192.168.122.100 192.168.122.200;
-    option routers 192.168.122.1;
+subnet 172.16.50.0 netmask 255.255.255.0 {
+    range 172.16.50.100 172.16.50.200;
+    option routers 172.16.50.1;
     option subnet-mask 255.255.255.0;
-    option broadcast-address 192.168.122.255;
+    option broadcast-address 172.16.50.255;
 }
 EOF
 ```
 
-### 2.3 Configurar e iniciar DHCP:
+### 2.4 Configurar e iniciar DHCP:
 ```bash
 sysrc dhcpd_enable="YES"
 sysrc dhcpd_ifaces="vtnet0"
@@ -98,11 +106,11 @@ EOF
 postconf -e "myhostname = jmrd.com"
 postconf -e "mydomain = jmrd.com"
 postconf -e "myorigin = \$mydomain"
-postconf -e "inet_interfaces = localhost, 192.168.122.100"
+postconf -e "inet_interfaces = localhost, 172.16.50.10"
 postconf -e "inet_protocols = ipv4"
 postconf -e "mydestination = \$myhostname, localhost.\$mydomain, localhost, \$mydomain"
 postconf -e "home_mailbox = Maildir/"
-postconf -e "mynetworks = 127.0.0.0/8, 192.168.122.0/24"
+postconf -e "mynetworks = 127.0.0.0/8, 172.16.50.0/24"
 postconf -e "smtpd_recipient_restrictions = permit_mynetworks, reject"
 postconf -e "smtpd_tls_security_level = none"
 ```
@@ -114,19 +122,24 @@ service postfix start
 
 ---
 
-## ✅ PASO 4: RESUMEN FINAL
+## ✅ PASO 4: VERIFICAR CONFIGURACIÓN
 
 ```bash
 echo "=== CONFIGURACIÓN COMPLETADA ==="
-echo "IP Servicios (vtnet0): 192.168.122.100"
-echo "IP Administración (vtnet1): 10.10.10.10"
-echo "Conectar: ssh root@10.10.10.10"
+echo "IP Administración (vtnet1): Obtendrá IP por DHCP"
+echo "IP Servicios (vtnet0): 172.16.50.10"
+echo "Red DHCP para clientes: 172.16.50.0/24"
+echo "Rango DHCP: 172.16.50.100 - 172.16.50.200"
+echo "Para conectar: Revisa la IP de vtnet1 con: ifconfig vtnet1"
 ```
 
 **🎯 ORDEN DE EJECUCIÓN:**
 1. **PASO 0** → Teclado
-2. **PASO 1** → SSH + Red administración  
-3. **PASO 2** → DHCP
+2. **PASO 1** → SSH + vtnet1 por DHCP
+3. **PASO 2** → vtnet0 IP fija + DHCP Server
 4. **PASO 3** → Postfix
 
-**¡Listo para usar!** 🚀
+**Después de configurar, verifica la IP de vtnet1 para conectarte:**
+```bash
+ifconfig vtnet1
+```
