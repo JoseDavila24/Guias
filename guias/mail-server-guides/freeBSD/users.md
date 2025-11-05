@@ -10,13 +10,12 @@ pw groupadd recursoshumanos
 ### 1.2 Crear usuario brenda:
 ```bash
 pw useradd brenda -c "Brenda - Recursos Humanos" -m -s /bin/tcsh -G recursoshumanos
-echo "brenda:1234" | chpasswd
-```
+echo "1234" | pw mod user brenda -h 0```
 
 ### 1.3 Crear usuario wendy:
 ```bash
 pw useradd wendy -c "Wendy - Recursos Humanos" -m -s /bin/tcsh -G recursoshumanos
-echo "wendy:1234" | chpasswd
+echo "1234" | pw mod user wendy -h 0
 ```
 
 ### 1.4 Crear buzones Maildir:
