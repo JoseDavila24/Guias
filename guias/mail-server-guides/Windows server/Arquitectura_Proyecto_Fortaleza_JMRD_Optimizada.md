@@ -9,6 +9,7 @@
 
 En Hyper-V no usamos cables, usamos **Conmutadores (Switches)**.
 
+```powershell
 graph TD
     %% Nodos de Infraestructura Hyper-V
     Host((PC Host "Aquiles"))
@@ -60,6 +61,7 @@ graph TD
     L1[--- Red Gestión / Internet]
     L2[=== Red Privada / Aislada]
     end
+```
 
 ### 1. Las Redes (Los Rieles)
 * **🌐 Default Switch (Gestión/WAN):**
