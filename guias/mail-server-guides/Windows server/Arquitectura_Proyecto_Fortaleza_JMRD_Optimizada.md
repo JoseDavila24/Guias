@@ -9,10 +9,57 @@
 
 En Hyper-V no usamos cables, usamos **Conmutadores (Switches)**.
 
+graph TD
+    %% Nodos de Infraestructura Hyper-V
+    Host((PC Host "Aquiles"))
+    DefSw[vSwitch: Default Switch <br/> NAT + Gestión]
+    PrivSw[vSwitch: JMRD_LAN_Privada <br/> Aislamiento Total]
 
+    %% Máquinas Virtuales (Nodos)
+    Sophos[VM: Sophos XG Firewall]
+    WinAD[VM: JMRD-DC <br/> Server Core]
+    WinEx[VM: JMRD-Exchange <br/> Server GUI]
+    Win10[VM: JMRD-Cliente <br/> Win 10]
 
-[Image of network topology with perimeter firewall DMZ and LAN zones]
+    %% Estilos Visuales
+    style Host fill:#f9f,stroke:#333,stroke-width:2px
+    style DefSw fill:#ffcccc,stroke:#f00,stroke-width:2px,color:#000
+    style PrivSw fill:#ccffcc,stroke:#0f0,stroke-width:2px,color:#000
+    style Sophos fill:#ff9900,stroke:#333,stroke-width:4px,color:#fff
+    style WinAD fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    style WinEx fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    style Win10 fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
 
+    %% --- CONEXIONES ZONA GESTIÓN (WAN/EXTERNA) ---
+    %% El Default Switch conecta tu PC real con las VMs para Internet y RDP
+    Host ---|Internet Compartido| DefSw
+    DefSw ---|Port A - WAN <br/> DHCP| Sophos
+    DefSw -.->|NIC 1 - Gestión <br/> DHCP| WinAD
+    DefSw -.->|NIC 1 - Gestión <br/> DHCP| WinEx
+
+    %% --- CONEXIONES ZONA PRODUCCIÓN (LAN PRIVADA) ---
+    %% El Private Switch es un "Vacío", solo las VMs se ven entre ellas
+    Sophos ===|Port B - LAN Gateway <br/> 10.10.10.1| PrivSw
+    PrivSw ===|NIC 2 - Producción <br/> 10.10.10.10| WinAD
+    PrivSw ===|NIC 2 - Producción <br/> 10.10.10.15| WinEx
+    PrivSw ===|NIC Única <br/> DHCP del Server| Win10
+
+    %% Agrupación lógica
+    subgraph HYPER-V HOST
+    DefSw
+    PrivSw
+    Sophos
+    WinAD
+    WinEx
+    Win10
+    end
+
+    %% Leyenda
+    subgraph LEYENDA
+    direction LR
+    L1[--- Red Gestión / Internet]
+    L2[=== Red Privada / Aislada]
+    end
 
 ### 1. Las Redes (Los Rieles)
 * **🌐 Default Switch (Gestión/WAN):**
