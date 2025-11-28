@@ -1,188 +1,141 @@
-# 🏛️ PROYECTO FORTALEZA JMRD: ARQUITECTURA OPTIMIZADA
+# 📘 GUÍA MAESTRA: FORTALEZA JMRD (HYPER-V NATIVO)
 
-**Filosofía:** "Headless First" (Sin monitores). Todo se gestiona por SSH/PowerShell Remoto.
+**Objetivo:** Infraestructura Empresarial (AD + Exchange + Firewall) Segura y Aislada.
+**Hardware:** Host Windows 11 Pro (24GB+ RAM).
 
-## 1. 🗺️ La Topología de Red (Gestión "Fuera de Banda")
+---
 
-Para usar Solar-Putty con Windows, necesitamos una red dedicada de gestión que no pase por el Firewall (Sophos), para que nunca pierdas acceso si configuras mal una regla de bloqueo.
+## 🗺️ LA ARQUITECTURA LÓGICA
 
-**Diseño Físico en GNS3:**
+En Hyper-V no usamos cables, usamos **Conmutadores (Switches)**.
 
-```mermaid
-graph TD
-    %% Nodos Principales
-    Cloud((Nube NAT / Internet))
-    SwMgmt[Switch GESTIÓN]
-    Sophos[Firewall SOPHOS]
-    SwLAN[Switch LAN Interno]
-    
-    %% Servidores y Clientes
-    WinAD[Win Server Core AD]
-    WinEx[Exchange Server]
-    Win10[PC Cliente Win10]
 
-    %% Estilos
-    style Cloud fill:#f9f,stroke:#333,stroke-width:2px
-    style SwMgmt fill:#ffcccc,stroke:#f00,stroke-width:2px
-    style Sophos fill:#ff9900,stroke:#333,stroke-width:4px
-    style SwLAN fill:#ccffcc,stroke:#0f0,stroke-width:2px
 
-    %% CONEXIONES GESTIÓN (RED ROJA 192.168.x.x)
-    Cloud ---|Internet + Tu PC| SwMgmt
-    SwMgmt ---|Port A - WAN| Sophos
-    SwMgmt -.->|NIC 1 - SSH/RDP| WinAD
-    SwMgmt -.->|NIC 1 - Web Admin| WinEx
+[Image of network topology with perimeter firewall DMZ and LAN zones]
 
-    %% CONEXIONES LAN PRODUCCIÓN (RED AZUL 10.10.10.x)
-    Sophos ===|Port B - Gateway| SwLAN
-    SwLAN ===|NIC 2 - Prod| WinAD
-    SwLAN ===|NIC 2 - Prod| WinEx
-    SwLAN ===|NIC Única| Win10
 
-    %% Leyenda
-    subgraph LEYENDA
-    direction LR
-    L1[--- Cable Gestión / WAN]
-    L2[=== Cable LAN / Interno]
-    end
-```
+### 1. Las Redes (Los Rieles)
+* **🌐 Default Switch (Gestión/WAN):**
+    * **Función:** Provee Internet (NAT) y acceso desde tu PC Host.
+    * **Seguridad:** Tu PC ve a las VMs, pero las VMs están "detrás" de una NAT. Seguro.
+* **🔒 JMRD_LAN_Privada (Producción/LAN):**
+    * **Función:** Red interna pura (`10.10.10.0/24`).
+    * **Seguridad:** **AISLAMIENTO TOTAL.** El tráfico de aquí (DHCP, DNS, Dominio) **no puede** escapar a tu tarjeta Wi-Fi física. Es un vacío digital.
 
-1.  **Nube (NAT):** Fuente de Internet y Acceso a tu Host.
-2.  **Switch de Gestión (Mgmt-SW):** Conectado a la Nube.
-3.  **Sophos Firewall:**
-      * **Port A (WAN):** Conectado a `Mgmt-SW`.
-      * **Port B (LAN):** Conectado al `Switch-Interno`.
-4.  **Switch Interno (LAN - 10.10.10.0/24):** Red segura/aislada.
-5.  **Servidores (Doble Interfaz):**
-      * **NIC 1 (Mgmt):** Conectada a `Mgmt-SW` (DHCP de la Nube). **IP para Solar-Putty.**
-      * **NIC 2 (LAN):** Conectada a `Switch-Interno` (IP Fija). **Tráfico de producción.**
+### 2. Los Actores (Las VMs)
+1.  **🛡️ Sophos XG:** El puente entre el mundo exterior (Default) y el interior (Privada).
+2.  **🧠 JMRD-DC (Server Core):** Controlador de Dominio y DHCP. Vive en ambas redes (para que lo administres) o solo en la privada.
+3.  **📧 JMRD-Exchange:** Servidor de Correo. Vive en la privada (pero con acceso a gestión).
+4.  **💻 Cliente Win10:** Vive **SOLO** en la privada. Su único camino a internet es cruzar el Sophos.
 
------
+---
 
-## 2. 🛠️ Requisitos de "Alto Rendimiento" (Drivers)
+## 🛠️ FASE 0: PREPARACIÓN DEL TERRENO (INFRAESTRUCTURA)
 
-Para que Windows en QEMU vuele y no se sienta lento, **ES OBLIGATORIO** usar los drivers **VirtIO**.
+### Paso 1: Crear el Switch Aislado
+1.  Abre **Administrador de Hyper-V**.
+2.  Panel derecho: **Administrador de conmutadores virtuales**.
+3.  Nuevo conmutador de red virtual > Tipo: **Privado**.
+4.  Clic en **Crear**.
+5.  Nombre: `JMRD_LAN_Privada`.
+6.  Aceptar.
 
-  * **Disco:** VirtIO SCSI (Lectura/Escritura nativa).
-  * **Red:** VirtIO Net (10Gbps virtuales).
-  * **Memoria:** Ballooning (Gestión eficiente).
+### Paso 2: Descargar Materiales (ISOs)
+Asegúrate de tener:
+* `Sophos XG Firewall (Versión para Hyper-V/Intel)`.
+* `Windows Server 2019`.
+* `Windows 10 Enterprise LTSC` (o Pro).
+* `Exchange Server 2019`.
 
-**Descarga obligatoria:** `virtio-win.iso` (Drivers estables de Fedora).
+---
 
------
+## 🛡️ FASE 1: DESPLIEGUE DEL GUARDIÁN (SOPHOS)
 
-## 3. 🏗️ El Plan de Despliegue (Paso a Paso)
+### 1. Crear la VM
+* **Nombre:** `JMRD-Sophos`.
+* **Generación:** **Generación 1** (Vital para compatibilidad con Sophos).
+* **Memoria:** 4096 MB (Desmarca "Memoria Dinámica").
+* **Red:** Conéctala a **Default Switch** (Esta será la WAN).
+* **Disco:** 20 GB.
+* **ISO:** Carga la imagen de Sophos.
 
-### FASE A: Controlador de Dominio (DC) - "El Cerebro Ligero"
+### 2. Configurar la Segunda Pata (LAN)
+Una vez creada, **no la enciendas aún**. Clic derecho > **Configuración**:
+1.  **Agregar Hardware** > Adaptador de Red > Agregar.
+2.  Conéctalo a: `JMRD_LAN_Privada`.
+3.  **⚠️ TRUCO VITAL (MAC Spoofing):**
+    * Despliega el menú (+) de **ambos** adaptadores de red.
+    * Ve a **Características avanzadas**.
+    * Marca la casilla: **"Habilitar suplantación de direcciones MAC"**.
+    * *(Sin esto, Sophos no puede enrutar tráfico en Hyper-V).*
 
-Usaremos **Windows Server 2019 Standard CORE** (Sin GUI).
+### 3. Instalación y IP
+* Instala Sophos.
+* En la consola negra, configura:
+    * **Port A (WAN):** DHCP.
+    * **Port B (LAN):** IP Estática `10.10.10.1` / `/24`.
 
-  * **Consumo:** ~700MB RAM.
-  * **Objetivo:** Active Directory + DNS.
-  * **Gestión:** 100% SSH/PowerShell.
+---
 
-**Configuración en GNS3:**
+## 🧠 FASE 2: EL CEREBRO (CONTROLADOR DE DOMINIO)
 
-1.  Crear plantilla QEMU `WinServer-Core`.
-2.  Montar ISO `Windows Server` + ISO `VirtIO`.
-3.  Instalar cargando el driver `vioscsi` (Disco) y `netkvm` (Red) durante la instalación.
+### 1. Crear la VM
+* **Nombre:** `JMRD-DC`.
+* **Generación:** **Generación 2** (Moderna y rápida).
+* **Memoria:** 2048 MB.
+* **Red:** Conéctala a **Default Switch** (Para gestión y updates).
 
-**⚡ El Truco SSH (PowerShell):**
-Una vez instalado, verás solo una pantalla negra (`sconfig`). Ejecuta esto para activar SSH y gestionarlo con Solar-Putty:
+### 2. Agregar Pata LAN
+* Configuración > Agregar Hardware > Adaptador de Red.
+* Conéctalo a: `JMRD_LAN_Privada`.
 
-```powershell
-# 1. Entrar a PowerShell
-PowerShell
+### 3. Configuración Interna (Post-Install)
+* Renombrar adaptadores (WAN / LAN).
+* **IP LAN:** `10.10.10.10`.
+* **Gateway LAN:** `10.10.10.1` (Apunta al Sophos).
+* **DNS:** `127.0.0.1` (Se apuntará a sí mismo cuando sea DC).
+* **Rol:** Instalar Active Directory y configurar dominio `JMRD.corp`.
+* **Rol:** Instalar DHCP (Scope `10.10.10.50` - `.200`).
 
-# 2. Instalar OpenSSH Server (Requiere internet en NIC 1)
-Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+---
 
-# 3. Iniciar servicios y ponerlos automáticos
-Start-Service sshd
-Set-Service -Name sshd -StartupType 'Automatic'
+## 💻 FASE 3: EL CLIENTE (LA PRUEBA DE AISLAMIENTO)
 
-# 4. Abrir el Firewall de Windows para el puerto 22
-New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server (sshd)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
-```
+### 1. Crear la VM
+* **Nombre:** `JMRD-Cliente`.
+* **Generación:** 2.
+* **Memoria:** 2048 MB.
+* **Red:** **SOLO** conecta a `JMRD_LAN_Privada`.
+    * *Al no conectarlo al Default Switch, garantizamos que si navega, es gracias a tu configuración.*
 
-*Resultado:* Cierras la consola VNC para siempre y usas Solar-Putty.
+### 2. Prueba de Fuego
+* Unir al dominio `JMRD.corp`.
+* Navegar en Internet (Debe pasar por: Cliente -> Switch Privado -> Sophos -> Default Switch -> Internet).
 
------
+---
 
-### FASE B: Exchange Server - "El Gigante"
+## 📧 FASE 4: EL GIGANTE (EXCHANGE SERVER)
 
-Exchange **requiere** mucha RAM. Aunque técnicamente *puede* correr en Core, para tu primera vez, recomiendo la versión **Desktop Experience (GUI)**, pero optimizaremos todo lo demás.
+### 1. Crear la VM
+* **Nombre:** `JMRD-Exchange`.
+* **Generación:** 2.
+* **Memoria:** 8192 MB (Mínimo recomendado).
+* **Red:** Doble pata (Default + Privada) igual que el DC.
 
-  * **Consumo:** Asignaremos **8 GB - 10 GB RAM**.
-  * **Optimización:**
-      * Desactivar Windows Defender (en lab es seguro y libera CPU).
-      * Desactivar efectos visuales.
-      * Instalar **OpenSSH** igual que en el Core para administrar la base por comandos.
-  * **Gestión:** La configuración de Exchange se hace vía Web (ECP) desde tu navegador en Windows 11, accediendo por la IP de Gestión.
+### 2. Despliegue
+* Unir al dominio.
+* Instalar prerrequisitos.
+* Instalar Exchange 2019.
 
------
+---
 
-### FASE C: Sophos XG - "El Muro"
+### 📝 Resumen de IPs (Para no perdernos)
 
-  * **Formato:** Plantilla QEMU dedicada.
-  * **Configuración:** SSH habilitado por defecto.
-  * **Gestión:** Vía Web `https://<IP_Gestion>:4444` desde tu Windows 11.
+| Dispositivo | Interfaz WAN (Gestión) | Interfaz LAN (Privada) | Gateway |
+| :--- | :--- | :--- | :--- |
+| **Sophos** | DHCP (172.x or 192.x) | **10.10.10.1** | (Del ISP) |
+| **DC (AD/DNS)** | DHCP | **10.10.10.10** | 10.10.10.1 |
+| **Exchange** | DHCP | **10.10.10.15** | 10.10.10.1 |
+| **Cliente** | --- | *DHCP (.50+)* | 10.10.10.1 |
 
------
-
-## 📝 GUÍA RÁPIDA DE COMANDOS (Tu "Cheat Sheet" para Solar-Putty)
-
-Una vez tengas tus servidores conectados por SSH, usarás estos comandos en Solar-Putty para configurar todo a la velocidad de la luz (Copiar/Pegar).
-
-### 1. Configurar Red (En Server Core DC)
-
-*Pegar en Solar-Putty:*
-
-```powershell
-# Renombrar adaptadores (Identificar por MAC o estado)
-Rename-NetAdapter -Name "Ethernet" -NewName "MGMT"
-Rename-NetAdapter -Name "Ethernet 2" -NewName "LAN"
-
-# Configurar IP LAN Fija
-New-NetIPAddress -InterfaceAlias "LAN" -IPAddress 10.10.10.10 -PrefixLength 24 -DefaultGateway 10.10.10.1
-
-# Establecer DNS (Google para salir, Localhost para AD)
-Set-DnsClientServerAddress -InterfaceAlias "LAN" -ServerAddresses ("127.0.0.1", "8.8.8.8")
-```
-
-### 2. Instalar Active Directory (En Server Core DC)
-
-*Pegar en Solar-Putty:*
-
-```powershell
-# Instalar Rol
-Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
-
-# Promover a Controlador de Dominio
-Install-ADDSForest -DomainName "JMRD.corp" -InstallDns:$true -Force:$true
-```
-
-### 3. Crear Usuarios Masivos (Script)
-
-*Pegar en Solar-Putty:*
-
-```powershell
-# Crear Unidad Organizacional
-New-ADOrganizationalUnit -Name "RecursosHumanos" -Path "DC=JMRD,DC=corp"
-
-# Crear Usuarios Brenda y Wendy
-New-ADUser -Name "Brenda" -GivenName Brenda -Surname RRHH -SamAccountName brenda -UserPrincipalName brenda@JMRD.corp -Path "OU=RecursosHumanos,DC=JMRD,DC=corp" -Enabled $true -PasswordNeverExpires $true -AccountPassword (ConvertTo-SecureString "JMRDpassword123!" -AsPlainText -Force)
-
-New-ADUser -Name "Wendy" -GivenName Wendy -Surname RRHH -SamAccountName wendy -UserPrincipalName wendy@JMRD.corp -Path "OU=RecursosHumanos,DC=JMRD,DC=corp" -Enabled $true -PasswordNeverExpires $true -AccountPassword (ConvertTo-SecureString "JMRDpassword123!" -AsPlainText -Force)
-```
-
------
-
-## 🚀 RESUMEN DEL FLUJO DE TRABAJO
-
-1.  **Crear Plantillas QEMU:** Windows Server Core (con VirtIO) y Windows 10 LTSC.
-2.  **Topología:** Montar el diseño de "Doble Switch" (Gestión + LAN).
-3.  **Instalación Base:** Instalar Windows en los nodos.
-4.  **Habilitar SSH:** Entrar una vez por VNC, activar OpenSSH y cerrar VNC para siempre.
-5.  **Configuración Turbo:** Abrir Solar-Putty, conectar a las IPs de gestión y pegar los scripts de PowerShell para crear el Dominio y los Usuarios.
-6.  **Exchange:** Instalarlo vía interfaz gráfica (RDP/VNC) pero gestionarlo vía Web.
+**¿Estás listo para iniciar la FASE 0 y crear los switches en Hyper-V?**
