@@ -6,8 +6,6 @@
 
 ## 🗺️ 1. ARQUITECTURA LÓGICA Y FÍSICA
 
-[Image of network topology with perimeter firewall DMZ and LAN zones]
-
 ```mermaid
 graph TD
     %% Nodos de Infraestructura Hyper-V
@@ -32,17 +30,17 @@ graph TD
     
     %% INTERNET / WAN (Port B)
     Host --- DefSw
-    DefSw ---|Port B - WAN <br/> (DHCP)| Sophos
+    DefSw ---|"Port B - WAN <br/> (DHCP)"| Sophos
     
     %% LAN PRIVADA (Port A)
-    Sophos ===|Port A - LAN <br/> (10.10.10.1)| PrivSw
+    Sophos ===|"Port A - LAN <br/> (10.10.10.1)"| PrivSw
     
     %% SERVIDORES Y CLIENTES
-    PrivSw ===|NIC 2 - LAN <br/> (10.10.10.10)| WinSrv
-    PrivSw ===|NIC Única| Win10
+    PrivSw ===|"NIC 2 - LAN <br/> (10.10.10.10)"| WinSrv
+    PrivSw ===|"NIC Única"| Win10
     
     %% GESTIÓN SERVIDOR (Opcional, para RDP directo)
-    DefSw -.->|NIC 1 - Gestión| WinSrv
+    DefSw -.->|"NIC 1 - Gestión"| WinSrv
 
     subgraph HYPER-V
     DefSw
