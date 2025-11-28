@@ -12,7 +12,7 @@ En Hyper-V no usamos cables, usamos **Conmutadores (Switches)**.
 ```mermaid
 graph TD
     %% Nodos de Infraestructura Hyper-V
-    Host((PC Host "Aquiles"))
+    Host((PC Host Aquiles))
     DefSw[vSwitch: Default Switch <br/> NAT + Gestión]
     PrivSw[vSwitch: JMRD_LAN_Privada <br/> Aislamiento Total]
 
