@@ -1,13 +1,13 @@
-# 📘 GUÍA MAESTRA: FORTALEZA JMRD (HYPER-V NATIVO)
+# 📘 GUÍA MAESTRA: PROYECTO FORTALEZA JMRD (Edición All-in-One)
 
-**Objetivo:** Infraestructura Empresarial (AD + Exchange + Firewall) Segura y Aislada.
-**Hardware:** Host Windows 11 Pro (24GB+ RAM).
+**Objetivo:** Desplegar una infraestructura empresarial completa (AD, DNS, DHCP, Exchange, Firewall) optimizando recursos al unificar roles en un servidor potente.
+**Plataforma:** Hyper-V Nativo en Windows 11.
 
----
+-----
 
-## 🗺️ LA ARQUITECTURA LÓGICA
+## 🗺️ 1. ARQUITECTURA DE RED
 
-En Hyper-V no usamos cables, usamos **Conmutadores (Switches)**.
+En lugar de cables físicos, utilizaremos **Conmutadores Virtuales (vSwitches)** de Hyper-V para crear zonas de seguridad.
 
 ```mermaid
 graph TD
@@ -18,8 +18,7 @@ graph TD
 
     %% Máquinas Virtuales (Nodos)
     Sophos[VM: Sophos XG Firewall]
-    WinAD[VM: JMRD-DC <br/> Server Core]
-    WinEx[VM: JMRD-Exchange <br/> Server GUI]
+    WinSrv[VM: JMRD-Server-AIO <br/> AD + DHCP + Exchange]
     Win10[VM: JMRD-Cliente <br/> Win 10]
 
     %% Estilos Visuales
@@ -27,22 +26,17 @@ graph TD
     style DefSw fill:#ffcccc,stroke:#f00,stroke-width:2px,color:#000
     style PrivSw fill:#ccffcc,stroke:#0f0,stroke-width:2px,color:#000
     style Sophos fill:#ff9900,stroke:#333,stroke-width:4px,color:#fff
-    style WinAD fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
-    style WinEx fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    style WinSrv fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
     style Win10 fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
 
     %% --- CONEXIONES ZONA GESTIÓN (WAN/EXTERNA) ---
-    %% El Default Switch conecta tu PC real con las VMs para Internet y RDP
     Host ---|Internet Compartido| DefSw
     DefSw ---|Port A - WAN <br/> DHCP| Sophos
-    DefSw -.->|NIC 1 - Gestión <br/> DHCP| WinAD
-    DefSw -.->|NIC 1 - Gestión <br/> DHCP| WinEx
+    DefSw -.->|NIC 1 - Gestión <br/> DHCP| WinSrv
 
     %% --- CONEXIONES ZONA PRODUCCIÓN (LAN PRIVADA) ---
-    %% El Private Switch es un "Vacío", solo las VMs se ven entre ellas
     Sophos ===|Port B - LAN Gateway <br/> 10.10.10.1| PrivSw
-    PrivSw ===|NIC 2 - Producción <br/> 10.10.10.10| WinAD
-    PrivSw ===|NIC 2 - Producción <br/> 10.10.10.15| WinEx
+    PrivSw ===|NIC 2 - Producción <br/> 10.10.10.10| WinSrv
     PrivSw ===|NIC Única <br/> DHCP del Server| Win10
 
     %% Agrupación lógica
@@ -50,141 +44,127 @@ graph TD
     DefSw
     PrivSw
     Sophos
-    WinAD
-    WinEx
+    WinSrv
     Win10
-    end
-
-    %% Leyenda
-    subgraph LEYENDA
-    direction LR
-    L1[--- Red Gestión / Internet]
-    L2[=== Red Privada / Aislada]
     end
 ```
 
-### 1. Las Redes (Los Rieles)
-* **🌐 Default Switch (Gestión/WAN):**
-    * **Función:** Provee Internet (NAT) y acceso desde tu PC Host.
-    * **Seguridad:** Tu PC ve a las VMs, pero las VMs están "detrás" de una NAT. Seguro.
-* **🔒 JMRD_LAN_Privada (Producción/LAN):**
-    * **Función:** Red interna pura (`10.10.10.0/24`).
-    * **Seguridad:** **AISLAMIENTO TOTAL.** El tráfico de aquí (DHCP, DNS, Dominio) **no puede** escapar a tu tarjeta Wi-Fi física. Es un vacío digital.
+### 📋 Resumen de Direccionamiento IP
 
-### 2. Los Actores (Las VMs)
-1.  **🛡️ Sophos XG:** El puente entre el mundo exterior (Default) y el interior (Privada).
-2.  **🧠 JMRD-DC (Server Core):** Controlador de Dominio y DHCP. Vive en ambas redes (para que lo administres) o solo en la privada.
-3.  **📧 JMRD-Exchange:** Servidor de Correo. Vive en la privada (pero con acceso a gestión).
-4.  **💻 Cliente Win10:** Vive **SOLO** en la privada. Su único camino a internet es cruzar el Sophos.
+| Dispositivo | Interfaz WAN (Gestión) | Interfaz LAN (Privada) | Gateway | Notas |
+| :--- | :--- | :--- | :--- | :--- |
+| **Sophos XG** | DHCP (Default Switch) | **10.10.10.1** | (ISP) | Firewall y Router principal |
+| **Server AIO** | DHCP (Default Switch) | **10.10.10.10** | 10.10.10.1 | Corre AD, DNS, DHCP, Exchange |
+| **Cliente Win10**| --- | *DHCP (.50)* | 10.10.10.1 | DNS apunta a 10.10.10.10 |
 
----
+-----
 
-## 🛠️ FASE 0: PREPARACIÓN DEL TERRENO (INFRAESTRUCTURA)
+## 🛠️ FASE 0: PREPARACIÓN DEL TERRENO
 
-### Paso 1: Crear el Switch Aislado
+### 1\. Crear el Switch Aislado
+
 1.  Abre **Administrador de Hyper-V**.
 2.  Panel derecho: **Administrador de conmutadores virtuales**.
-3.  Nuevo conmutador de red virtual > Tipo: **Privado**.
+3.  Nuevo conmutador de red virtual \> Tipo: **Privado**.
 4.  Clic en **Crear**.
 5.  Nombre: `JMRD_LAN_Privada`.
 6.  Aceptar.
 
-### Paso 2: Descargar Materiales (ISOs)
-Asegúrate de tener:
-* `Sophos XG Firewall (Versión para Hyper-V/Intel)`.
-* `Windows Server 2019`.
-* `Windows 10 Enterprise LTSC` (o Pro).
-* `Exchange Server 2019`.
+### 2\. Materiales Necesarios (ISOs)
 
----
+  * `Sophos XG Firewall` (Versión para Hyper-V/Intel).
+  * `Windows Server 2019` (Standard Evaluation).
+  * `Windows 10 Enterprise LTSC` (o Pro).
+  * `Exchange Server 2019` (Cumulative Update más reciente si es posible).
+
+-----
 
 ## 🛡️ FASE 1: DESPLIEGUE DEL GUARDIÁN (SOPHOS)
 
-### 1. Crear la VM
-* **Nombre:** `JMRD-Sophos`.
-* **Generación:** **Generación 1** (Vital para compatibilidad con Sophos).
-* **Memoria:** 4096 MB (Desmarca "Memoria Dinámica").
-* **Red:** Conéctala a **Default Switch** (Esta será la WAN).
-* **Disco:** 20 GB.
-* **ISO:** Carga la imagen de Sophos.
+### 1\. Crear la VM `JMRD-Sophos`
 
-### 2. Configurar la Segunda Pata (LAN)
-Una vez creada, **no la enciendas aún**. Clic derecho > **Configuración**:
-1.  **Agregar Hardware** > Adaptador de Red > Agregar.
-2.  Conéctalo a: `JMRD_LAN_Privada`.
-3.  **⚠️ TRUCO VITAL (MAC Spoofing):**
-    * Despliega el menú (+) de **ambos** adaptadores de red.
-    * Ve a **Características avanzadas**.
-    * Marca la casilla: **"Habilitar suplantación de direcciones MAC"**.
-    * *(Sin esto, Sophos no puede enrutar tráfico en Hyper-V).*
+  * **Generación:** **Generación 1** (Vital para compatibilidad).
+  * **Memoria:** 4096 MB.
+  * **Red:** Conéctala a **Default Switch** (WAN).
+  * **Disco:** 20 GB.
 
-### 3. Instalación y IP
-* Instala Sophos.
-* En la consola negra, configura:
-    * **Port A (WAN):** DHCP.
-    * **Port B (LAN):** IP Estática `10.10.10.1` / `/24`.
+### 2\. Configurar la Segunda Pata (LAN)
 
----
+  * Configuración \> Agregar Hardware \> Adaptador de Red.
+  * Conéctalo a: `JMRD_LAN_Privada`.
+  * **⚠️ TRUCO VITAL:** En *ambos* adaptadores \> Características avanzadas \> Marca **"Habilitar suplantación de direcciones MAC"**.
 
-## 🧠 FASE 2: EL CEREBRO (CONTROLADOR DE DOMINIO)
+### 3\. Configuración Inicial (Consola)
 
-### 1. Crear la VM
-* **Nombre:** `JMRD-DC`.
-* **Generación:** **Generación 2** (Moderna y rápida).
-* **Memoria:** 2048 MB.
-* **Red:** Conéctala a **Default Switch** (Para gestión y updates).
+  * Instala Sophos.
+  * En el menú de consola, configura:
+      * **Port A (WAN):** DHCP.
+      * **Port B (LAN):** IP Estática `10.10.10.1` / `/24`.
 
-### 2. Agregar Pata LAN
-* Configuración > Agregar Hardware > Adaptador de Red.
-* Conéctalo a: `JMRD_LAN_Privada`.
+-----
 
-### 3. Configuración Interna (Post-Install)
-* Renombrar adaptadores (WAN / LAN).
-* **IP LAN:** `10.10.10.10`.
-* **Gateway LAN:** `10.10.10.1` (Apunta al Sophos).
-* **DNS:** `127.0.0.1` (Se apuntará a sí mismo cuando sea DC).
-* **Rol:** Instalar Active Directory y configurar dominio `JMRD.corp`.
-* **Rol:** Instalar DHCP (Scope `10.10.10.50` - `.200`).
+## 🧠 FASE 2: EL SERVIDOR "TODO EN UNO"
 
----
+### 1\. Crear la VM `JMRD-Server-AIO`
 
-## 💻 FASE 3: EL CLIENTE (LA PRUEBA DE AISLAMIENTO)
+  * **Generación:** 2.
+  * **Memoria:** **12288 MB** (12 GB). *Exchange necesita mucha RAM.*
+  * **Red 1:** Default Switch (Para actualizaciones y RDP).
+  * **Red 2:** `JMRD_LAN_Privada` (Para servir a la red interna).
+  * **Instalación:** Elige **Windows Server 2019 Standard (Desktop Experience)**.
 
-### 1. Crear la VM
-* **Nombre:** `JMRD-Cliente`.
-* **Generación:** 2.
-* **Memoria:** 2048 MB.
-* **Red:** **SOLO** conecta a `JMRD_LAN_Privada`.
-    * *Al no conectarlo al Default Switch, garantizamos que si navega, es gracias a tu configuración.*
+### 2\. Configuración de Red (Dentro de Windows)
 
-### 2. Prueba de Fuego
-* Unir al dominio `JMRD.corp`.
-* Navegar en Internet (Debe pasar por: Cliente -> Switch Privado -> Sophos -> Default Switch -> Internet).
+  * **NIC 1 (Gestión):** Déjala en DHCP.
+  * **NIC 2 (LAN):**
+      * IP: **10.10.10.10**
+      * Mascara: `255.255.255.0`
+      * Gateway: **10.10.10.1**
+      * DNS: **127.0.0.1** (Se apuntará a sí mismo).
 
----
+### 3\. Instalar Roles Base (AD + DHCP)
 
-## 📧 FASE 4: EL GIGANTE (EXCHANGE SERVER)
+  * **Active Directory:**
+      * Instala el rol AD DS.
+      * Promueve a Controlador de Dominio: `JMRD.corp`.
+      * Reinicia.
+  * **DHCP:**
+      * Instala el rol DHCP.
+      * Crea un Ámbito (Scope): `10.10.10.50` - `.200`.
+      * Opciones de Ámbito: Router `10.10.10.1`, DNS `10.10.10.10`.
 
-### 1. Crear la VM
-* **Nombre:** `JMRD-Exchange`.
-* **Generación:** 2.
-* **Memoria:** 8192 MB (Mínimo recomendado).
-* **Red:** Doble pata (Default + Privada) igual que el DC.
+### 4\. Instalar Exchange Server 2019
 
-### 2. Despliegue
-* Unir al dominio.
-* Instalar prerrequisitos.
-* Instalar Exchange 2019.
+  * Instala prerrequisitos (.NET 4.8, Visual C++, IIS, RSAT-ADDS).
+  * Monta la ISO de Exchange.
+  * Ejecuta `Setup.exe`.
+  * Selecciona "Mailbox Role".
+  * Deja que termine la instalación (puede tardar 30-60 mins).
 
----
+-----
 
-### 📝 Resumen de IPs (Para no perdernos)
+## 💻 FASE 3: EL CLIENTE (WINDOWS 10)
 
-| Dispositivo | Interfaz WAN (Gestión) | Interfaz LAN (Privada) | Gateway |
-| :--- | :--- | :--- | :--- |
-| **Sophos** | DHCP (172.x or 192.x) | **10.10.10.1** | (Del ISP) |
-| **DC (AD/DNS)** | DHCP | **10.10.10.10** | 10.10.10.1 |
-| **Exchange** | DHCP | **10.10.10.15** | 10.10.10.1 |
-| **Cliente** | --- | *DHCP (.50+)* | 10.10.10.1 |
+### 1\. Crear la VM `JMRD-Cliente`
 
-**¿Estás listo para iniciar la FASE 0 y crear los switches en Hyper-V?**
+  * **Generación:** 2.
+  * **Memoria:** 2048 MB.
+  * **Red:** Conéctala **SOLO** a `JMRD_LAN_Privada`.
+
+### 2\. Integración
+
+  * Verifica que recibe IP automática (ej. `10.10.10.50`).
+  * Verifica navegación (debe pasar por Sophos).
+  * Une el equipo al dominio `JMRD.corp`.
+  * Inicia sesión con un usuario de dominio (ej. `JMRD\Brenda`).
+
+-----
+
+## ✅ CHECKLIST FINAL DE ÉXITO
+
+1.  [ ] **Sophos:** Accesible vía web desde el cliente (`https://10.10.10.1:4444`).
+2.  [ ] **AD:** Usuarios Brenda y Wendy creados y logueándose.
+3.  [ ] **Internet:** Cliente navega protegido por Sophos.
+4.  [ ] **Correo:** Exchange instalado y accesible vía OWA (`https://10.10.10.10/owa`).
+
+¡Esta es la ruta crítica\! Tienes el plan, los materiales y el conocimiento. ¡A construir\! 🚀
