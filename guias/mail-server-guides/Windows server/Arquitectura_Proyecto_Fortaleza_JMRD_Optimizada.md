@@ -9,7 +9,7 @@
 
 En Hyper-V no usamos cables, usamos **Conmutadores (Switches)**.
 
-```powershell
+```mermaid
 graph TD
     %% Nodos de Infraestructura Hyper-V
     Host((PC Host "Aquiles"))
