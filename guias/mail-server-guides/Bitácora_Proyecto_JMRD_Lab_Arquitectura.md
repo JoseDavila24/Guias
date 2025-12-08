@@ -9,12 +9,12 @@ graph TD
     subgraph "🏗️ ARQUITECTURA MATRYOSHKA"
         direction TB
         
-        C1[🧱 HARDWARE<br/>Intel i5 11th Gen]
-        C2[🪟 WINDOWS 11]
-        C3[⚡ HYPER-V]
-        C4[🐧 GNS3 VM]
-        C5[⚙️ QEMU/KVM]
-        C6[🖥️ FreeBSD/Ubuntu]
+        C1["🧱 HARDWARE<br/>Intel i5 11th Gen"]
+        C2["🪟 WINDOWS 11"]
+        C3["⚡ HYPER-V"]
+        C4["🐧 GNS3 VM"]
+        C5["⚙️ QEMU/KVM"]
+        C6["🖥️ FreeBSD/Ubuntu"]
     end
     
     %% CONEXIONES VERTICALES
@@ -25,12 +25,12 @@ graph TD
     C5 --> C6
     
     %% COMANDO MÁGICO
-    MAGIC[✨ "Set-VMProcessor<br/>-ExposeVirtualizationExtensions $true"]
-    MAGIC -.->|Atraviesa capas| C6
+    MAGIC["✨ Set-VMProcessor<br/>-ExposeVirtualizationExtensions $true"]
+    MAGIC -.->|"Atraviesa capas"| C6
     
     %% ANOTACIONES
-    NOTE1[🔍 Nested Virtualization:<br/>Virtualización Anidada]
-    NOTE2[🎯 Instrucciones del CPU<br/>llegan hasta la capa 6]
+    NOTE1["🔍 Nested Virtualization:<br/>Virtualización Anidada"]
+    NOTE2["🎯 Instrucciones del CPU<br/>llegan hasta la capa 6"]
     
     NOTE1 --> C3
     NOTE2 --> C6
