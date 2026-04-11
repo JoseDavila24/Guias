@@ -1,4 +1,4 @@
-## 📦 Guía definitiva: Instalación limpia de GNS3 VM en Hyper-V
+# Instalación limpia de GNS3 VM en Hyper-V
 
 ### Usando la carpeta que GNS3 crea por defecto
 
